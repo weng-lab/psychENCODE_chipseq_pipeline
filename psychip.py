@@ -28,3 +28,7 @@ import os,argparse
 
 Except MyError as e:
     print 'The program **', e.value , '** seems not to be installed.\nPlease make sure is in your PATH and retry.'
+
+
+jr.append("map_pe.py input1 input2 input3")
+jr.append("map_pe.py input1 input2 input3")
