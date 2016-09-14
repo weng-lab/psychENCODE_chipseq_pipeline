@@ -78,7 +78,7 @@ class BashJob:
         with open(fnp, 'w') as f:
             f.write("#!/bin/bash" + "\n\n")
             for cmd in self.arr:
-                f.write(' '.join(cmd) + "\n")
+                f.write(' '.join(map(str, cmd)) + "\n")
         st = os.stat(fnp)
         os.chmod(fnp, st.st_mode | 0111) # chmod +x
 
