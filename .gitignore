@@ -92,3 +92,4 @@ ENV/
 license_header
 beta_*
 common/hg38_sponges.fa
+hg38_sponges.fa
