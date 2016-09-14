@@ -20,11 +20,30 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ########################################################################
 
-import os,argparse
+
+import os
+
+class ProgramNotFound(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
 
 
+#Check if a program is visible in the scope.
+def which(program):
+# modified from http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            path = path.strip('"')
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
 
-
-
-Except MyError as e:
-    print 'The program **', e.value , '** seems not to be installed.\nPlease make sure is in your PATH and retry.'
+    raise ProgramNotFound(program)
