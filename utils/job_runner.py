@@ -64,7 +64,8 @@ class PythonJob:
         return rets
 
     def __repr__(self):
-        return "job: " + "\n\t" + str(self.arr)
+        #return "job: " + "\n\t" + str(self.arr)
+        return "ok"
 
     @staticmethod
     def ClusterBsubCmd(jobFolder, scriptFnp):
@@ -87,8 +88,7 @@ class BashJob:
         for cmds in self.arr:
             ret = Utils.runCmds(cmds, debug)
             if ret:
-                rets.append(ret)
-                #print(idx, '/', total, "".join(ret).strip())
+                print(idx, '/', total, "".join(ret).strip())
         return rets
 
     def __repr__(self):
