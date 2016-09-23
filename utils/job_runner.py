@@ -40,7 +40,9 @@ def runJob(job, idx, total, debug, func):
         for row in rets:
             for r in row:
                 outs += r
-        print(idx + 1, '/', total, "OK:", outs)
+#        print(idx + 1, '/', total, "OK:", outs)
+        print(idx, '/', total, "OK:", outs)
+        return outs
     except Exception, e:
         print(idx + 1, '/', total, "ERROR: {e}".format(e=e))
         print(traceback.print_exc())
@@ -87,8 +89,9 @@ class BashJob:
         rets = []
         for cmds in self.arr:
             ret = Utils.runCmds(cmds, debug)
-            if ret:
-                print(idx, '/', total, "".join(ret).strip())
+            #if ret:
+                #print(idx, '/', total, "".join(ret).strip())
+            rets.append("".join(ret).strip())
         return rets
 
     def __repr__(self):

@@ -118,7 +118,7 @@ def bed2bb(bed_filename, chrom_sizes, as_file, bed_type='bed6+4'):
         print "head %s" %(fn)
         print subprocess.check_output('head %s' %(fn), shell=True, stderr=subprocess.STDOUT)
 
-    command = "bedToBigBed -type=%s -as=%s %s %s %s" %(bed_type, as_file, bed_filename_sorted, chrom_sizes, bb_filename)
+    command = "./common/bedToBigBed -type=%s -as=%s %s %s %s" %(bed_type, as_file, bed_filename_sorted, chrom_sizes, bb_filename)
     print command
     try:
         process = subprocess.Popen(shlex.split(command), stderr=subprocess.STDOUT, stdout=subprocess.PIPE)

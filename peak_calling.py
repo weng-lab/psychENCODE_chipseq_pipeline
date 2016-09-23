@@ -93,7 +93,6 @@ class Macs2PeakCaller():
 
         # Rescale Col5 scores to range 10-1000 to conform \
         # to narrowPeak.as format (score must be <1000)
-        # TODO check is common is supported
         rescaled_narrowpeak_fn = utils.common.rescale_scores(
                                  '%s/%s_peaks.narrowPeak' \
                                   %(peaks_dirname, prefix), 
@@ -104,22 +103,24 @@ class Macs2PeakCaller():
                    awk 'BEGIN{OFS=\"\\t\"}{$4=\"Peak_\"NR ; \
                    print $0}' | tee %s | gzip -c > %s" \
                    %(rescaled_narrowpeak_fn, narrowPeak_fn,
-                   narrowPeak_gz_fn)
+                   self.narrowPeak_gz_fn)
 
         job.append([["%s" %(command)]])
         job.run()
 
         # remove additional files
-        #command ="rm -f ${PEAK_OUTPUT_DIR}/${CHIP_TA_PREFIX}_peaks.xls ${PEAK_OUTPUT_DIR}/${CHIP_TA_PREFIX}_peaks.bed ${peakFile}_summits.bed"
-        #job.append([["%s" %(command)]])
-        #job.run()
+        command ="rm -f %s/%s_peaks.xls %s/%s_peaks.bed %s_summits.bed"\
+                  %(peaks_dirname, prefix,
+                    peaks_dirname, prefix, prefix)
+        job.append([["%s" %(command)]])
+        job.run()
         #===========================================
         # Generate Broad and Gapped Peaks
         #============================================
         command = '/home/matteie/Programs/macs2/bin/macs2 callpeak ' + \
                   '-t %s -c %s ' \
                   %(self.experiment_name, self.control_name) + \
-                  '-f %s -n %s/%s'%(self.input_type, 
+                  '-f %s -n %s/%s '%(self.input_type, 
                                     peaks_dirname, prefix) + \
                   '-g %s -p 1e-2 --broad --nomodel --shift 0 \
                   --extsize %s --keep-dup all' \
@@ -158,7 +159,8 @@ class Macs2PeakCaller():
         job.run()
 
         # remove additional file
-        #rm -f ${PEAK_OUTPUT_DIR}/${CHIP_TA_PREFIX}_peaks.xls ${PEAK_OUTPUT_DIR}/${CHIP_TA_PREFIX}_peaks.bed ${peakFile}_summits.bed
+        job.append([["rm -f %s/%s_peaks.xls %s/%s_peaks.bed %s_summits.bed" %(peaks_dirname,prefix,peaks_dirname,prefix,prefix)]])
+        job.run()
 
         #===========================================
         # For Fold enrichment signal tracks
@@ -196,34 +198,35 @@ class Macs2PeakCaller():
         #===========================================
         # Compute sval = min(no. of reads in ChIP, no. of reads in control) / 1,000,000
         if (self.input_type=="BED" or self.input_type=="BEDPE") :
-            jr.append([['gzip -dc %s' %(self.experiment_name)+'|wc -l']])
-            chipReads = jr.run().strip()
-            jr.append([['gzip -dc %s' %(self.control_name)+'|wc -l']])
-            controlReads = jr.run().strip()
+            job.append([['gzip -dc %s' %(self.experiment_name)+'|wc -l']])
+            chipReads = int(job.run()[0])
+            job.append([['gzip -dc %s' %(self.control_name)+'|wc -l']])
+            controlReads = int(job.run()[0])
             sval=str(min(float(chipReads), float(controlReads))/1000000)
         else:
-            jr.append([["samtools idxstats %s | awk '{sum=sum+$3}END{print sum}'"%(self.experiment_name)]])
-            chipReads = jr.run()[0]
-            jr.append([["samtools idxstats %s | awk '{sum=sum+$3}END{print sum}'"%(self.control_name)]])
-            controlReads = jr.run()[0]
+            job.append([["samtools idxstats %s | awk '{sum=sum+$3}END{print sum}'"%(self.experiment_name)]])
+            chipReads = int(job.run()[0])
+            job.append([["samtools idxstats %s | awk '{sum=sum+$3}END{print sum}'"%(self.control_name)]])
+            controlReads = int(job.run()[0])
             sval=str(min(float(chipReads), float(controlReads))/1000000)
             print sval,chipReads,controlReads
         print "chipReads = %s, controlReads = %s, sval = %s" %(chipReads, controlReads, sval)
 
-        jr.append([['/home/matteie/Programs/macs2/bin/macs2 bdgcmp ' + \
+        job.append([['/home/matteie/Programs/macs2/bin/macs2 bdgcmp ' + \
                 '-t %s/%s_treat_pileup.bdg ' %(peaks_dirname, prefix) + \
                 '-c %s/%s_control_lambda.bdg ' %(peaks_dirname, prefix) + \
                 '--outdir %s -o %s_ppois.bdg ' %(peaks_dirname, prefix) + \
                 '-m ppois -S %s' %(sval)]])
-        jr.run()
+        job.run()
         # Remove coordinates outside chromosome sizes (stupid MACS2 bug)
-        jr.append([['bedtools slop -i %s/%s_ppois.bdg -g %s -b 0' 
+        job.append([['bedtools slop -i %s/%s_ppois.bdg -g %s -b 0' 
                    %(self.chrom_sizes_name,peaks_dirname, prefix)+ \
                 '| ./common/bedClip stdin %s %s/%s.pval.signal.bedgraph'
                  %(self.chrom_sizes_name,peaks_dirname, prefix)]])
-        jr.run()
+        job.run()
 
-        #rm -rf ${PEAK_OUTPUT_DIR}/${CHIP_TA_PREFIX}_ppois.bdg
+        job.append([["rm -rf %s/%s_ppois.bdg" %(peaks_dirname,prefix)]])
+        job.run()
 
         # Convert bedgraph to bigwig
         command = './bedGraphToBigWig ' + \
@@ -232,8 +235,9 @@ class Macs2PeakCaller():
 
         job.append([["%s" %(command)]])
         job.run()
-        #rm -f ${PEAK_OUTPUT_DIR}/${CHIP_TA_PREFIX}.pval.signal.bedgraph
-        #rm -f ${PEAK_OUTPUT_DIR}/${CHIP_TA_PREFIX}_treat_pileup.bdg ${peakFile}_control_lambda.bdg
+        job.append([["rm -f %s/%s.pval.signal.bedgraph" %(peaks_dirname,prefix)]])
+        job.append([["rm -f %s/%s_treat_pileup.bdg %s_control_lambda.bdg" %(peaks_dirname,prefix,prefix)]])
+        job.run()
         #===========================================
         # Generate bigWigs from beds to support trackhub visualization of peak files
         #============================================
