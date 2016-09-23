@@ -81,28 +81,77 @@ def remove_dups_sponges(picard_jar, flt_bam, cpu_num, sponge, job)
 
     """
     final_bam = flt_bam[:-4] + ".nodup.bam"
+    final_bam = flt_bam[:-4] + ".nodup.bai"
 
     tmp_bam = flt_bam[:-4] + ".dupmark.bam"
     dup_qc = flt_bam[:-4] + ".dup.qc"
     picard_cmd = \
         """java -Xmx4G -jar {} MarkDuplicates INPUT={} \
-            OUTPUT={} METRICS_FILE={} ASSUME_SORTED=true \
-            VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=false
+           OUTPUT={} METRICS_FILE={} ASSUME_SORTED=true \
+           VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=false
         """.format(picard_jar, flt_bam, tmp_bam, dup_qc)
     job.append([[ picard_cmd ]])
+    job.append([[ "mv {} {}".format(tmp_bam, flt_bam) ]])
 
-    #mv ${TMP_FILT_BAM_FILE} ${FILT_BAM_FILE}
-    #rm ${RAW_BAM_FILE}
+    #rm ${RAW_BAM_FILE} ## TODO
 
     if sponge:
-    samtools view -F 1804 -f 2 -h ${FILT_BAM_FILE} | \
-    grep -v -F -f ${EXCLUDE} - | samtools view -Su - > ${FINAL_BAM_FILE}
+        filter_dups_sponge_cmd = \
+            """samtools view -F 1804 -f 2 -h {} | \
+               grep -vF -f{} - | \
+               samtools view -Su - > {}
+            """.format(flt_bam, sponge, final_bam)
+        job.append([[ filter_dups_sponge_cmd ]])
     else:
-    samtools view -F 1804 -f 2 -b ${FILT_BAM_FILE} > ${FINAL_BAM_FILE}
+        filter_dups_cmd = \
+            "samtools view -F1804 -f2 -b {} > {}".format(flt_bam,
+                                                         final_bam)
+        job.append([[ filter_dups_cmd ]])
 
-#### Remove duplicates and sponges, and create final name sorted BAM
-FINAL_BAM_INDEX_FILE="${FINAL_BAM_PREFIX}.bai"
-FINAL_BAM_FILE_MAPSTATS="${FINAL_BAM_PREFIX}.flagstat.qc"
+    make_index_cmd = \
+        "samtools index {} {}".foramt(final_bam, final_index)
+    job.append([[ make_index_cmd ]])
+
+    ## TODO
+    ## FINAL_BAM_FILE_MAPSTATS="${FINAL_BAM_PREFIX}.flagstat.qc"
+    ## QC: samtools flagstat ${FINAL_BAM_FILE} > ${FINAL_BAM_FILE_MAPSTATS}"
+
+    job.run()
+
+    return final_bam
+
+
+def generate_bedpe(final_bam, cpu_num, job):
+    """Returns BEDPE file name
+       Makes BEDPE file with the final cleaned BAM file.
+    
+    """
+    bedpe3 = final_bam[:-4] + ".bedpe3.gz"
+    bedpe7 = final_bam[:-4] + ".bedpe7.gz"
+    nmsrt_bam = final_bam[:-4] + ".nmsrt.bam"
+
+    name_sort_cmd = "samtools sort -n {} {}".format(final_bam,
+                                                    nmsrt_bam[:-4])
+    job.append([[ name_sort_cmd ]])
+
+    bedtools_cmd = \
+        """bedtools bamtobed -bedpe -mate1 -i {} | \
+         gzip -c > {}""".format(nmsrt_bam, bedpe7)
+    job.append([[ bedtools_cmd ]])
+
+    bedpe3_cmd = \
+        """zcat {} | \
+           awk 'BEGIN{OFS="\t"; FS="\t"}
+               {chrom=$1; beg=$2; end=$6;
+               if($2>$5){beg=$5} if($3>$6){end=$3}
+               print chrom,beg,end}' - > {}
+        """.format(bedpe7, bedpe3)
+    job.append([[ bedpe3_cmd ]])
+    job.append([[ "rm {}".format(nmsrt_bam) ]])
+
+    job.run()
+
+    return (bedpe3, bedpe7)
 
 
 def filter(raw_sam, cpu_num):
@@ -121,55 +170,7 @@ def filter(raw_sam, cpu_num):
     flt_bam = remove_aberrant_reads(raw_bam, cpu_num, job)
 
     ## Filter PCR duplicates
-    remove_dups_sponges(flt_bam, cpu_num, job)
+    final_bam = remove_dups_sponges(flt_bam, cpu_num, job)
 
-FINAL_NMSRT_BAM_PREFIX="${OFPREFIX}.filt.nmsrt.nodup"
-FINAL_NMSRT_BAM_FILE="${FINAL_NMSRT_BAM_PREFIX}.bam"
-samtools sort -n ${FINAL_BAM_FILE} ${FINAL_NMSRT_BAM_PREFIX}
-
-#### Index final sorted BAM
-samtools index ${FINAL_BAM_FILE}
-mv ${FINAL_BAM_FILE}.bai ${FINAL_BAM_INDEX_FILE}
-samtools flagstat ${FINAL_BAM_FILE} > ${FINAL_BAM_FILE_MAPSTATS}
-
-
-#### Compute library complexity
-# Tab-delimited output:
-# [1] TotalReadPairs
-# [2] DistinctReadPairs
-# [3] OneReadPairs
-# [4] TwoReadPairs
-# [5] NRF=Distinct/Total
-# [6] PBC1=OnePair/Distinct
-# [7] PBC2=OnePair/TwoPair
-PBC_FILE_QC="${FINAL_BAM_PREFIX}.pbc.qc"
-samtools sort -n ${FILT_BAM_FILE} ${FILT_BAM_FILE}_tmp
-mv ${FILT_BAM_FILE}_tmp.bam ${FILT_BAM_FILE}
-echo 1 | awk '{print "#Total\tDistinct\tOne\tTwo\tNRF\tPBC1\tPBC2"}' > ${PBC_FILE_QC}
-bedtools bamtobed -bedpe -i ${FILT_BAM_FILE} | \
-awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | grep -v 'chrM' | sort | uniq -c | \
-awk 'BEGIN{mt=0;m0=0;m1=0;m2=0}
-     ($1==1){m1=m1+1} ($1==2){m2=m2+1} {m0=m0+1} {mt=mt+$1}
-     END{printf "%d\t%d\t%d\t%d\t%f\t%f\t%f\n",mt,m0,m1,m2,m0/mt,m1/m0,m1/m2}' >> ${PBC_FILE_QC}
-rm ${FILT_BAM_FILE}
-
-
-
-    BEDPE 2 files
-    bedpe3.gz
-    bedpe7.gz
-
-#### Convert final name sorted BAM to BEDPE
-FINAL_BEDPE_FILE="${FINAL_NMSRT_BAM_PREFIX}.bedpe.gz"
-bedtools bamtobed -bedpe -mate1 -i ${FINAL_NMSRT_BAM_FILE} | gzip -c > ${FINAL_BEDPE_FILE}
-rm ${FINAL_NMSRT_BAM_FILE}
-
-#### Clean up
-mv ${FINAL_BEDPE_FILE} "${OFPREFIX}.bedpe.gz"
-mv ${FINAL_BAM_FILE} "${OFPREFIX}.bam"
-mv ${FINAL_BAM_INDEX_FILE} "${OFPREFIX}.bai"
-mv ${PBC_FILE_QC} "${OFPREFIX}".QC.pbc
-mv ${DUP_FILE_QC} "${OFPREFIX}".QC.markdups
-mv ${RAW_BAM_FILE_MAPSTATS} "${OFPREFIX}".QC.raw.mapstats
-mv ${FINAL_BAM_FILE_MAPSTATS} "${OFPREFIX}".QC.final.mapstats
-
+    ## Generate BEDPE file
+    bedpe3, bedpe7 = generate_bedpe(final_bam, cpu_num, job)
