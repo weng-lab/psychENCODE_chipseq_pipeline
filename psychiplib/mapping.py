@@ -45,7 +45,7 @@ class BwaMapper():
             os.makedirs(self.output_dir)
 
         # Extract prefix
-        fq1 = os.path.basename(fastq1)
+        fq1 = os.path.basename(self.fastq1)
         ext = re.search(".f[ast]*q", fq1)
         if ext:
             prefix = fq1[:ext.start()]
@@ -57,8 +57,6 @@ class BwaMapper():
         command = "bwa mem -M -t %s %s " %(cpu_num, self.genome_index) \
                    + "%s %s " %(self.fastq1, self.fastq2) \
                    + "| gzip -c > %s" %(sam_output)
-
-        print command # debug
 
         job.append([[command]])
         job.run()

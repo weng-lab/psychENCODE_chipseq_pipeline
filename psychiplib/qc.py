@@ -20,6 +20,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ########################################################################
 
+#!/usr/bin/env python
+
+import os
 
 import utils.job_runner as jr
 
@@ -29,6 +32,12 @@ class QC():
         self.output_dir = output_dir
 
     def get_mapstats(self, raw_bam, final_bam):
+        if not os.path.exists(raw_bam):
+            raise Exception("raw BAM file does not exist")
+
+        if not os.path.exists(final_bam):
+            raise Exception("final BAM file does not exist")
+
         job = jr.JobRunner()
 
         raw_bam_qc = raw_bam[:-3] + "flagstat.QC.txt"
@@ -39,21 +48,25 @@ class QC():
         job.append([[ command %(final_bam, final_bam_qc) ]])
         job.run()
 
-        return (raw_bam_qc, final_bam_qc)
-
 
     def get_library_complexity(self, flt_bam, threads=1):
+        if not os.path.exists(flt_bam):
+            raise Exception("filtered BAM file does not exist")
+
         job = jr.JobRunner()
 
         prefix = os.path.basename(flt_bam).split(".flt.")[0]
 
         tmp_bam = "%s/%s.tmp.bam" %(self.output_dir, prefix)
-        qc_pbc = "%s/%s_libComplexity.QC.txt" %(self.output_dir, prefix)
+        qc_pbc = "%s/%s.libComplexity.QC.txt" %(self.output_dir, prefix)
 
-        command = "samtools sort -n -@ %s " %(threads)
+        command = "samtools sort -n -@ %s " %(threads)\
                    + "-o %s %s" %(tmp_bam, flt_bam)
         job.append([[ command ]])
+        job.run()
+
         job.append([[ "mv %s %s" %(tmp_bam, flt_bam) ]])
+        job.run()
 
         # Library Complexity
         # [1] TotalReadPairss
@@ -67,31 +80,49 @@ class QC():
                      awk '{print "#Total\tDistinct\tOne\tTwo\tNRF\tPBC1\tPBC2"}' \
                      > %s""" %(qc_pbc)
         job.append([[ command ]])
+        job.run()
 
         command = """bamToBed -bedpe -i %s | \
                      awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | \
                      grep -v 'chrM' | sort | uniq -c | \
-                     awk 'BEGIN{mt=0;m0=0;m1=0;m2=0}
+                     awk 'BEGIN{mt=0;m0=0;m1=0;m2=0; OFS="\t"}
                                ($1==1){m1=m1+1} ($1==2){m2=m2+1} {m0=m0+1} {mt=mt+$1}
-                          END{printf "%d\t%d\t%d\t%d\t%f\t%f\t%f\n",mt,m0,m1,m2,m0/mt,m1/m0,m1/m2}'
+                          END{print mt,m0,m1,m2,m0/mt,m1/m0,m1/m2}'\
                      >> %s""" %(flt_bam, qc_pbc)
         job.append([[ command ]])
         job.run()
 
-        return qc_pbc
 
+    def cross_correlation(self, bedpe, phantompeak_script, cpu_num):
+        if not os.path.exists(bedpe):
+            raise Exception("BEDPE file does not exist")
 
-    def clean(self, final_bam):
-        prefix = os.path.basename(final_bam).split(".final.")[0]
-        raw_sam = "%s/%s.raw.sam.gz" %(self.output_dir, prefix)
-        raw_bam = "%s/%s.raw.bam" %(self.output_dir, prefix)
-        flt_bam = "%s/%s.flt.bam" %(self.output_dir, prefix)
-
-        # Clean up intermediate files
         job = jr.JobRunner()
-        job.append([[ "rm %s" %(raw_sam) ]])
-        job.append([[ "rm %s" %(raw_bam) ]])
-        job.append([[ "rm %s" %(flt_bam) ]])
+
+        prefix = bedpe.split(".bedpe.")[0]
+        subsample_tags = prefix + ".subsample.tagAlign.gz"
+
+        cc_plot = prefix + "_crossCorrPlot.QC.pdf"
+        cc_score = prefix + "_crossCorrScore.QC.txt"
+
+        command = """zcat %s | grep -v 'chrM' | shuf -n 15000000 | \
+                     awk 'BEGIN{OFS="\t"}{print $1,$2,$3,"N","1000",$9}' | \
+                     gzip -c > %s""" %(bedpe, subsample_tags)
+        job.append([[ command ]])
         job.run()
 
+        command = "Rscript %s " %(phantompeak_script)\
+                   + "-c=%s -p=%s -filtchr=chrM " %(subsample_tags, cpu_num)\
+                   + "-savp=%s -out=%s" %(cc_plot, cc_score)
+        job.append([[ command ]])
+        job.run()
 
+        command = """sed -r 's/,[^\t]+//g' %s | \
+                     awk -F ".subsample.tagAlign.gz" '{print $1".bam"$2}' \
+                     >> %s.tmp""" %(cc_score, cc_score)
+        job.append([[ command ]])
+        job.run()
+
+        job.append([[ "mv %s.tmp %s" %(cc_score, cc_score) ]])
+        job.append([[ "rm %s" %(subsample_tags) ]])
+        job.run()
