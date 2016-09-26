@@ -28,35 +28,35 @@ import re
 import utils.job_runner as jr
 
 class BwaMapper():
-    def __init__(self, fastq1, fastq2, genome_index, output_dir, cpu_num):
+    def __init__(self, fastq1, fastq2, genome_index, output_dir):
         self.fastq1 = fastq1
         self.fastq2 = fastq2
         self.genome_index = genome_index
         self.output_dir = output_dir
-        self.cpu_num = cpu_num
 
 
-    def run(self):
+    def run(self, cpu_num):
+        if cpu_num <= 0:
+            raise Exeption("The number of CPU must be > 0!")
+
         job = jr.JobRunner()
 
-        # Define the outputs
-        output_dir = self.output_dir
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
         # Extract prefix
         fq1 = os.path.basename(fastq1)
         ext = re.search(".f[ast]*q", fq1)
         if ext:
-            self.prefix = fq1[:ext.start()]
+            prefix = fq1[:ext.start()]
         else:
-            self.prefix = fq1
+            prefix = fq1
         
-        sam_output = "%s/%s.raw.sam.gz" %(output_dir, prefix)
+        sam_output = "%s/%s.raw.sam.gz" %(self.output_dir, prefix)
 
-        command = "bwa mem -M -t %s %s" %(self.cpu_num, self.genome_index) \
-                + "%s %s" %(self.fastq1, self.fastq2) \
-                + "| gzip -c > %s" %(sam_output)
+        command = "bwa mem -M -t %s %s " %(cpu_num, self.genome_index) \
+                   + "%s %s " %(self.fastq1, self.fastq2) \
+                   + "| gzip -c > %s" %(sam_output)
 
         print command # debug
 
