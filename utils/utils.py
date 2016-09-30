@@ -533,8 +533,8 @@ class Utils:
                 exe_file = os.path.join(path, program)
                 if is_exe(exe_file):
                     return exe_file
-
-        return None
+        raise Exception("'%s' NOT found! Please make sure the program is installed and included in yout $PATH" %(program))
+        #return None
 
     @staticmethod
     def merge_two_dicts(x, y):
