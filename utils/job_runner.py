@@ -123,9 +123,14 @@ class JobRunner:
         self.jobs.append(self.jobType(job))
 
     def run(self, func = None):
-        total = len(self.jobs)
-        ret = Parallel(n_jobs = self.num_cores)(delayed(runJob)(job, idx, total, False, func)
-                                                for idx, job in enumerate(self.jobs))
+        if self.num_cores == 1:
+            for idx, job in enumerate(self.jobs):
+                for cmd in job.arr:
+                    ret = [Utils.runCmds(cmd)[0]]
+        else:
+            total = len(self.jobs)
+            ret = Parallel(n_jobs = self.num_cores)(delayed(runJob)(job, idx, total, False, func)
+                                                        for idx, job in enumerate(self.jobs))
         self.jobs = []
         return ret
 

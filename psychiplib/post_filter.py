@@ -29,7 +29,7 @@ import utils.job_runner as jr
 
 
 class PostFilter():
-    def __init__(self, raw_sam, output_dir):
+    def __init__(self, raw_sam, prefix, output_dir):
         self.output_dir = output_dir
         self.prefix = os.path.basename(raw_sam).split(".raw.")[0]
 
