@@ -22,84 +22,215 @@
 
 from __future__ import print_function
 
-import utils.job_runner
-import os,sys
+import utils.job_runner as jr
+import os,sys,json,shutil
 import psychiplib.mapping as mp
 import psychiplib.post_filter as pf
 import psychiplib.qc as qc
-import 
-import
-import
+import psychiplib.pseudoreps as psr
+import psychiplib.peak_calling as pc
+import psychiplib.overlap as ovrlp
+import traceback
 
-
-inputs = sys.argv[1]
+inputs={}
+with open(sys.argv[1], 'r') as inputs_json:
+    inputs=json.load(inputs_json)
 idx = int(sys.argv[2])
 
 
-test_map = mp.BwaMapper(inputs['inputs'][idx][0], # fastq read 1
-                        inputs['inputs'][idx][1], # fastq read 2
-                        inputs['prefix_inputs'][idx], #prefix
-                        inputs['sponges'], # bwa index
-                        os.path.join(inputs['outdir'],\
-                                     inputs['prefix_inputs'][idx]))
-                                     # output directory
 
-test_map.run(inputs['cpus']) # CPU for BWA
-                 # Output: R1.raw.sam.gz
-                 # Format: <prefix>.raw.sam.gz
+def run_main(inputs,idx):
+    ### ALIGN INPUT LIBRARIES
+    run_map_input = mp.BwaMapper(inputs['inputs'][idx][0], # fastq read 1
+                            inputs['inputs'][idx][1], # fastq read 2
+                            inputs['prefix_inputs'][idx], #prefix
+                            inputs['index'], # bwa index
+                            os.path.join(os.path.join(inputs['outdir'],\
+                                         inputs['prefix_inputs'][idx]),\
+                                         "bwa_out"))
+                                         # output directory
 
-
-### Post alignment filtering
-test_filter = pf.PostFilter("%s/%s.raw.sam.gz" %(os.path.join(inputs['outdir'], inputs['prefix_inputs'][idx]))) #raw sam file
-                            inputs['outdir']) # output directory
-
-## Step 1: remove reads with bad CIGAR strings
-test_filter.remove_badcigar(inputs['cpus']) # Threads for SAMtools
-                                # Output: R1.raw.bam
-                                # Format: <prefix>.raw.bam
-
-## Step 2: remove unmapped, low quality, orphan, and supplemental reads
-test_filter.remove_aberrant_reads(inputs['cpus']) # Threads for SAMtools
-                                      # Output: R1.flt.bam
-                                      # Format: <prefix>.flt.bam
-
-## Step 3: remove PCR duplicates and sponge mapping reads
-##         (currently, "java -Xmx4G". Please change it if needed)
-test_filter.remove_artifacts("path/to/picard.jar",  # path to picard.jar
-                             inputs['sponges']) # sponge name list
-                                                    # Output: R1.final.[bam|bai], R1.pcrDups.QC.txt
-
-## Step 4: generate BED and BEDPE files
-##         (those files are *unsorted*)
-test_filter.generate_bed(inputs['cpus']) # Threads for SAMtools
-                             # Output: R1.bed.gz (for pseudorep)
-                             # Output: R1.bedpe.gz (bedtool raw output)
+    run_map_input.run(inputs['cpus']) # CPU for BWA
+                     # Output: R1.raw.sam.gz
+                     # Format: <prefix>.raw.sam.gz
 
 
-### QC part
-#test_qc = qc.QC("test_out") # output direcotry
+    ### Post alignment filtering
+    run_filter_input = pf.PostFilter("%s/%s/bwa_out/%s.raw.sam.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx],inputs['prefix_inputs'][idx]), \
+                               "%s/%s/bwa_out" %(inputs['outdir'], inputs['prefix_inputs'][idx])) # output directory
 
-## Step 1: Get map stats
-#test_qc.get_mapstats("test_out/R1.raw.bam",   # Output: R1.raw.flagstat.QC.txt
-#                     "test_out/R1.final.bam") # Output: R1.final.flagstat.QC.txt
+    ## Step 1: remove reads with bad CIGAR strings
+    run_filter_input.remove_badcigar(inputs['cpus']) # Threads for SAMtools
+                                    # Output: R1.raw.bam
+                                    # Format: <prefix>.raw.bam
 
-## Step 2: Compute library complexity
-#test_qc.get_library_complexity("test_out/R1.flt.bam", 16) # Threads for SAMtools
-                                                          # Output: R1.libComplexity.QC.txt
+    ## Step 2: remove unmapped, low quality, orphan, and supplemental reads
+    run_filter_input.remove_aberrant_reads(inputs['cpus']) # Threads for SAMtools
+                                          # Output: R1.flt.bam
+                                          # Format: <prefix>.flt.bam
 
-## Step 3: *!NOT TESTED!* Cross correlation coefficient
-#test_qc.cross_correlation("test_out/R1.bedpe.gz",                  # BEDPE file
-#                          "phantompeakqualtools/run_spp_nodups.R", # phantompeakqualtools
-#                          32)                                      # Number of CPU for phantompeakqualtools
+    ## Step 3: remove PCR duplicates and sponge mapping reads
+    ##         (currently, "java -Xmx4G". Please change it if needed)
+    run_filter_input.remove_artifacts(inputs['picard'],  # path to picard.jar
+                                 inputs['threads'],
+                                 inputs['sponges']) # sponge name list
+                                                        # Output: R1.final.[bam|bai], R1.pcrDups.QC.txt
 
-## Clean up intermediate files (if needed)
-## It removes R1.raw.sam.gz, R1.raw.bam, R1.flt.bam
-#test_filter.clean()
+    ## Step 4: generate BED and BEDPE files
+    ##         (those files are *unsorted*)
+    run_filter_input.generate_bed(inputs['cpus']) # Threads for SAMtools
+                                 # Output: R1.bed.gz (for pseudorep)
+                                 # Output: R1.bedpe.gz (bedtool raw output)
 
 
-### PSEUDOREP
+    if not os.path.isdir("%s/%s/macs_input/" %(inputs['outdir'], inputs['prefix_inputs'][idx])):
+        os.mkdir("%s/%s/macs_input/" %(inputs['outdir'], inputs['prefix_inputs'][idx]))
+    if not os.path.isfile("%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx])):
+        shutil.move("%s/%s/bwa_out/%s.bed.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),\
+               "%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]))
 
-### PEAK
+    ### ALIGN CONTROL LIBRARIES
+    run_map_control = mp.BwaMapper(inputs['controls'][idx][0], # fastq read 1
+                            inputs['controls'][idx][1], # fastq read 2
+                            inputs['prefix_controls'][idx], #prefix
+                            inputs['index'], # bwa index
+                            os.path.join(os.path.join(inputs['outdir'],\
+                                         inputs['prefix_controls'][idx]),\
+                                         "bwa_out"))
+                                         # output directory
 
-### OVERLAP
+    run_map_control.run(inputs['cpus']) # CPU for BWA
+                     # Output: R1.raw.sam.gz
+                     # Format: <prefix>.raw.sam.gz
 
+
+    ### Post alignment filtering
+    run_filter_control = pf.PostFilter("%s/%s/bwa_out/%s.raw.sam.gz" %(inputs['outdir'], inputs['prefix_controls'][idx],inputs['prefix_controls'][idx]),
+                               "%s/%s/bwa_out" %(inputs['outdir'], inputs['prefix_controls'][idx])) # output directory
+
+    ## Step 1: remove reads with bad CIGAR strings
+    run_filter_control.remove_badcigar(inputs['cpus']) # Threads for SAMtools
+                                    # Output: R1.raw.bam
+                                    # Format: <prefix>.raw.bam
+
+    ## Step 2: remove unmapped, low quality, orphan, and supplemental reads
+    run_filter_control.remove_aberrant_reads(inputs['cpus']) # Threads for SAMtools
+                                          # Output: R1.flt.bam
+                                          # Format: <prefix>.flt.bam
+
+    ## Step 3: remove PCR duplicates and sponge mapping reads
+    ##         (currently, "java -Xmx4G". Please change it if needed)
+    run_filter_control.remove_artifacts(inputs['picard'],  # path to picard.jar
+                                 inputs['threads'],
+                                 inputs['sponges']) # sponge name list
+                                                        # Output: R1.final.[bam|bai], R1.pcrDups.QC.txt
+
+    ## Step 4: generate BED and BEDPE files
+    ##         (those files are *unsorted*)
+    run_filter_control.generate_bed(inputs['cpus']) # Threads for SAMtools
+                                 # Output: R1.bed.gz (for pseudorep)
+                                 # Output: R1.bedpe.gz (bedtool raw output)
+
+
+    if not os.path.isdir("%s/%s/macs_input/" %(inputs['outdir'], inputs['prefix_controls'][idx])):
+        os.mkdir("%s/%s/macs_input/" %(inputs['outdir'], inputs['prefix_controls'][idx]))
+    if not os.path.isfile("%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx])):
+        shutil.move("%s/%s/bwa_out/%s.bed.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]),\
+               "%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]))
+
+    run_filter_control.clean()
+
+    ### QC part
+    test_qc = qc.QC("%s/%s/bwa_out/" %(inputs['outdir'], inputs['prefix_inputs'][idx])) # output direcotry
+
+    ## Step 1: Get map stats
+    test_qc.get_mapstats("%s/%s/bwa_out/%s.raw.bam" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
+                         "%s/%s/bwa_out/%s.final.bam" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx])) # Output: R1.final.flagstat.QC.txt
+
+    ## Step 2: Compute library complexity
+    test_qc.get_library_complexity("%s/%s/bwa_out/%s.flt.bam" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]), inputs['cpus']) # Threads for SAMtools
+                                                              # Output: R1.libComplexity.QC.txt
+    '''
+    ## Step 3: *!NOT TESTED!* Cross correlation coefficient
+    test_qc.cross_correlation("%s/%s/bwa_out/%s.bedpe.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]), # BEDPE file
+                              "%s/common/run_spp_nodups.R" %(os.path.dirname(os.path.abspath(__file__))), # phantompeakqualtools
+                              inputs['cpus'])                                      # Number of CPU for phantompeakqualtools
+    '''
+    job=jr.JobRunner()
+    insert = 150
+    job.append([["java -jar %s CollectInsertSizeMetrics I=%s/%s/bwa_out/%s.final.bam\
+                  O=%s/%s/bwa_out/InsertSizeMetrics.txt AS=F H=%s/%s/bwa_out/InsertSizeMetrics.histogram" \
+                  %(inputs['picard'],inputs['outdir'],inputs['prefix_inputs'][idx],inputs['prefix_inputs'][idx],\
+                    inputs['outdir'],inputs['prefix_inputs'][idx],\
+                    inputs['outdir'],inputs['prefix_inputs'][idx])]])
+    job.run()
+
+    job.append([["grep -A2 \"## METRICS CLASS\" %s/%s/bwa_out/InsertSizeMetrics.txt | tail -1 | cut -f1" %(inputs['outdir'],inputs['prefix_inputs'][idx])]])
+    insert=job.run()[0]
+
+    #run_filter_input.clean()
+
+
+    ### PSEUDOREP
+    run_psr = psr.PseudorepsGenerator("%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),\
+                                      inputs['prefix_inputs'][idx],
+                                      "%s/%s/macs_input/" %(inputs['outdir'], inputs['prefix_inputs'][idx]),
+                                      inputs['threads'],
+                                      inputs['cpus'])
+
+    run_psr.run()
+
+
+
+    ### PEAK
+    run_peak=pc.Macs2PeakCaller("%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
+                         "%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]),
+                         insert,
+                         "BEDPE",
+                         "%s/%s/macs_output/%s" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
+                         inputs['genome'],"hs")
+    run_peak.run()
+
+    run_peak=pc.Macs2PeakCaller("%s/%s/macs_input/psr_%s.00.bedpe.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
+                         "%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]),
+                         insert,
+                         "BEDPE",
+                         "%s/%s/macs_output/psr_%s.00" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
+                         inputs['genome'],
+                         "hs")
+    run_peak.run()
+
+    run_peak=pc.Macs2PeakCaller("%s/%s/macs_input/psr_%s.01.bedpe.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
+                         "%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]),
+                         insert,
+                         "BEDPE",
+                         "%s/%s/macs_output/psr_%s.01" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
+                         inputs['genome'],
+                         "hs")
+    run_peak.run()
+
+
+
+    ### OVERLAP
+    run_overlap=ovrlp.Overlap(inputs['prefix_inputs'][idx],inputs['outdir'])
+    run_overlap.run()
+
+try:
+    run_main(inputs, idx)
+except Exception, err:
+    try:
+        exc_info = sys.exc_info()
+
+        # do you usefull stuff here
+        # (potentially raising an exception)
+        try:
+            raise TypeError("Again !?!")
+        except:
+            pass
+        # end of useful stuff
+
+
+    finally:
+        # Display the *original* exception
+        traceback.print_exception(*exc_info)
+        del exc_info

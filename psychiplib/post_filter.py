@@ -29,7 +29,7 @@ import utils.job_runner as jr
 
 
 class PostFilter():
-    def __init__(self, raw_sam, prefix, output_dir):
+    def __init__(self, raw_sam, output_dir):
         self.output_dir = output_dir
         self.prefix = os.path.basename(raw_sam).split(".raw.")[0]
 
@@ -68,10 +68,10 @@ class PostFilter():
         # Remove the reads with bad CIGAR strings
         if len(peek):
             command = "zcat %s | grep -vF -f %s | " %(self.raw_sam, badcigar)\
-                       + "samtools view -u - | " \
+                       + "samtools view -@ %s -Su - | " %(threads) \
                        + "samtools sort -@ %s -o %s -" %(threads, self.raw_bam)
         else:
-            command = "samtools view -u %s | " %(self.raw_sam)\
+            command = "samtools view -@ %s -Su %s | " %(threads, self.raw_sam)\
                        + "samtools sort -@ %s -o %s -" %(threads, self.raw_bam)
         job.append([[ command ]])
         job.run()
@@ -90,7 +90,7 @@ class PostFilter():
         tmp_clean_bam = "%s/%s.tmp.clean.bam" %(self.output_dir, self.prefix)
 
         # Filter unmapped and low quality (MAPQ<20) reads
-        command = "samtools view -F1804 -f2 -q20 "\
+        command = "samtools view -@ %s -F1804 -f2 -q 20 -h" %(threads)\
                    + "-u %s | " %(self.raw_bam)\
                    + "samtools sort -@ %s -o %s -n -" %(threads, tmp_bam)
         job.append([[ command ]])
@@ -101,7 +101,7 @@ class PostFilter():
         command = "samtools fixmate -r %s %s" %(tmp_bam, tmp_clean_bam)
         job.append([[ command ]])
         job.run()
-        command = "samtools view -F1804 -f2 -u %s | " %(tmp_clean_bam)\
+        command = "samtools view -@ %s -F1804 -f2 -u %s | " %(threads, tmp_clean_bam)\
                    + "samtools sort -@ %s -o %s -" %(threads, self.flt_bam)
         job.append([[ command ]])
         job.run()
@@ -110,7 +110,7 @@ class PostFilter():
         job.run()
 
 
-    def remove_artifacts(self, picard_jar, sponge=None):
+    def remove_artifacts(self, picard_jar, threads = 1, sponge=None):
         if not os.path.exists(self.flt_bam):
             raise Exception("filtered BAM file does not exist!")
 
@@ -131,12 +131,12 @@ class PostFilter():
         job.run()
 
         if sponge:
-            command = "samtools view -F1804 -f2 -h %s | " %(self.flt_bam)\
+            command = "samtools view -@ %s -F1804 -f2 -h %s | " %(threads, self.flt_bam)\
                        + "grep -vF -f %s - | " %(sponge)\
-                       + "samtools view -o %s -Su -" %(self.final_bam)
+                       + "samtools view -@ %s -b -o %s -" %(threads, self.final_bam)
             job.append([[ command ]])
         else:
-            command = "samtools view -F1804 -f2 -b "\
+            command = "samtools view -@ %s -F1804 -f2 -b " %(threads)\
                        + "-o %s %s" %(self.final_bam, self.flt_bam)
             job.append([[ command ]])
         job.run()
@@ -155,11 +155,11 @@ class PostFilter():
 
         tmp_bam = "%s/%s.tmp.bam" %(self.output_dir, self.prefix)
 
-        command = "samtools sort -n -o %s %s" %(tmp_bam, self.final_bam)
+        command = "samtools sort -@ %s -n -o %s %s" %(threads, tmp_bam, self.final_bam)
         job.append([[ command ]])
         job.run()
 
-        command = "bamToBed -bedpe -mate1 -i %s | " %(tmp_bam)\
+        command = "bedtools bamtobed -bedpe -mate1 -i %s | " %(tmp_bam)\
                    + "gzip -c > %s" %(self.bedpe)
         job.append([[ command ]])
         job.run()
@@ -169,7 +169,7 @@ class PostFilter():
                           { chrom=$1; beg=$2; end=$6;
                             if($2>$5){beg=$5} if($3>$6){end=$3}
                             print chrom,beg,end
-                          }' - > %s""" %(self.bedpe, self.bed)
+                          }' - | sort --parallel=%s -k1,1 -k2,2n |gzip -c > %s""" %(self.bedpe, threads, self.bed)
         job.append([[ command ]])
         job.run()
 

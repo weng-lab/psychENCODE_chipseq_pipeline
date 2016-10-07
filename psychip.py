@@ -25,14 +25,14 @@ from __future__ import print_function
 import os,argparse,sys,json
 import utils.utils as u
 import utils.job_runner as jr
-
+import re
 
 def input_integrity(input_file):
     try:
         inputs = []
         prefix_inputs = []
         controls = []
-        prefix_counts = []
+        prefix_controls= []
         count = 1
         with open(input_file,"r") as f:
             for line in f:
@@ -47,14 +47,14 @@ def input_integrity(input_file):
                     if test %2 != 0:
                         raise Exception("One or more files in line %s don't exist. Please check your input" %(str(count)))
                     
-                    inputs.append([fields[0], fields[1]])
-                    prefix_inputs.append([extract_prefix(fields[0]),extract_prefix(fields[1])])
+                    inputs.append([files[0], files[1]])
+                    prefix_inputs.append(extract_prefix(files[0]))
                     
-                    if len(fields) == 4 :
-                        controls.append([fields[2], fields[3]])
-                        prefix_controls.append([extract_prefix(fields[2]),extract_prefix(fields[3])])
+                    if len(files) == 4 :
+                        controls.append([files[2], files[3]])
+                        prefix_controls.append(extract_prefix(files[2]))
                     count = count+1
-
+        print("Input Integrity Verification Completed")
     except Exception as e:
         raise(e)
 
@@ -75,6 +75,7 @@ def check_requirements():
         checker.which('bwa')
         checker.which('bedtools')
         checker.which('samtools')
+        checker.which('R')
         #check sort version
         #check samtools version
         #check ('java -jar picard.jar') #How to check this properly?
@@ -87,14 +88,15 @@ def check_arguments(args):
     try:
         # Check if the input files exist and are well formatted
         os.path.isfile(args['f'])
-#        inputs['input'], inputs['controls'], inputs['prefix_inputs'], inputs['prefix_controls'] = input_integrity(args['f'])
-
+        inputs['inputs'], inputs['controls'], inputs['prefix_inputs'], inputs['prefix_controls'] = input_integrity(args['f'])
+        
         # Check if the output folder exist
         if os.path.isdir(args['o']):
             raise Exception("mkdir: cannot create directory '%s': File exists." %(args['o']))
         else :
+            os.makedirs(args['o'])
             inputs['outdir'] = args['o']
-
+        
         # Check if Bowtie index exists
         if args['b'].endswith('.bwt') :
             prefix_index = os.path.splitext(args['b'])[0]
@@ -105,11 +107,13 @@ def check_arguments(args):
             if not os.path.isfile("%s%s" %(prefix_index,suffix)):
                 raise Exception("The BWA index file '%s%s' does not exist." %(prefix_index,suffix))
         inputs['index'] = prefix_index
+        
 
         # Check if genome file exists 
         if not os.path.isfile(args['g']):
             raise Exception("The genome chromInfo file '%s' does not exist." %(args['g']))
         inputs['genome'] = args['g']
+        
         
         if args['sponges'] != None :
             if not os.path.isfile(args['sponges']):
@@ -117,10 +121,17 @@ def check_arguments(args):
             inputs['sponges'] = args['sponges']
         else:
             inputs['sponges'] = None
+
+        
+
+        if not os.path.exists(args['picard']):
+            raise Exception("Picard not found in '%s'" %(args['picard']))
+        else:
+            inputs['picard'] = args['picard']
+        
         
         inputs['threads'] = args['t']
         inputs['cpus'] = args['c']
-        
         
         
         # If not enough controls are supplied, use pooled controls.
@@ -128,7 +139,8 @@ def check_arguments(args):
             inputs['pooled'] = True
         else:
             inputs['pooled'] = False
-
+        
+        print("Argument Verification completed")
     except Exception as e:
         raise(e)
     
@@ -138,26 +150,30 @@ def check_arguments(args):
 
 
 def main(inputs):
+    with open('%s/inputs.json' %(inputs['outdir']), 'w') as outfile:
+        json.dump(inputs, outfile)
+
     job = jr.JobRunner(cpus = inputs['threads'])
     
     print("--- Welcome to the pipeline ---")
     if inputs['pooled']:
         print("Warning : The controls libraries will be pooled together.")
-        for idx in len(inputs['inputs']):
+        for idx in range(len(inputs['inputs'])):
             job.append([["python run_psychip.py map %s inputs" %(idx)]])
-        for idx in len(inputs['controls']):
+        for idx in range(len(inputs['controls'])):
             job.append([["python run_psychip.py map %s controls" %(idx)]])
         job.run()
 
         job.append([["python run_psychip.py pooling"]])
         job.run()
 
-        for idx in len(inputs['inputs']):
+        for idx in range(len(inputs['inputs'])):
             job.append([["python run_psychip.py peak %s" %(idx)]])
         job.run()
     else:
-        for idx in len(inputs['inputs']):
-            job.append([["python run_psychip.py complete %s" %(n)]])
+        for idx in range(len(inputs['inputs'])):
+            #job.append([["python run_psychip.py complete %s" %(idx)]])
+            job.append([["python run_psychip.py %s/inputs.json %s" %(inputs['outdir'], idx)]])
         job.run()
 
 
@@ -181,6 +197,7 @@ if __name__ == "__main__":
                                #threads * #cpus.""")
     parser.add_argument('--sponges', metavar = 'FILE', help = "Sponges file used to \
                                              remove sequences")
+    parser.add_argument('--picard', metavar = 'FILE', help = "Location of picard.jar package e.g. \(/home/user/picard-tools-1.141/picard.jar\)")
     #parser.add_argument('--single', help = "If the library is \
     #                                        single-end")
     #parser.add_argument('--cluster', help = "#developping")

@@ -29,39 +29,42 @@ import utils.job_runner as jr
 
 class PseudorepsGenerator:
 
-    def __init__(self, arr_inputs, out_folder):
-        self.input_file = arr_inputs
-        self.out = os.path.join(out_folder,self.input_file)
-        #self.names = self.find_names()
+    def __init__(self, filepath,  prefix, out, threads, cpus ):
+        self.prefix = prefix
+        self.threads = threads
+        self.input_file = filepath
+        self.out = out
+        self.cpus= cpus
 
     def run(self):
-        input_path = os.path.join(self.out,
-                                  "%s.bedpe.gz" %(self.input_file))
         job = jr.JobRunner()
 
         # Shuffle input
         print("Shuffle input")
         shuf_out = os.path.join(self.out,
-                                "shuf_%s.bedpe" %(self.input_file))
-        job.append([["zcat %s | shuf > %s" %(input_path,shuf_out)]])
+                                "shuf_%s.bedpe" %(self.prefix))
+        job.append([["zcat %s | shuf > %s" %(self.input_file,shuf_out)]])
         job.run()
 
         # Split into two files
         print("split in two")
-        psr_prefix = os.path.join(self.out,"psr_%s." %(self.input_file))
+        psr_prefix = os.path.join(self.out,"psr_%s." %(self.prefix))
         job.append([["split -d -nl/2 --additional-suffix=\".bedpe\"\
                       %s %s" %(shuf_out,psr_prefix)]])
         job.run()
 
         # TODO core to be set according to input parameters
         print("sort")
-        job = jr.JobRunner( cpus = 2 )
-        job.append([["sort --parallel=4 -S 2G \
+        job = jr.JobRunner()
+        job.append([["sort --parallel=%s -S 2G \
                      -k1,1 -k2,2n %s00.bedpe | gzip -c > %s00.bedpe.gz" 
-                     %(psr_prefix,psr_prefix)]])
-        job.append([["sort --parallel=4 -S 2G \
+                     %(self.cpus, psr_prefix, psr_prefix)]])
+        job.append([["sort --parallel=%s -S 2G \
                      -k1,1 -k2,2n %s01.bedpe | gzip -c > %s01.bedpe.gz" 
-                     %(psr_prefix,psr_prefix)]])
+                     %(self.cpus, psr_prefix, psr_prefix)]])
+        #job.append([["zcat %s | sort --parallel=%s -S 2G \
+        #             -k1,1 -k2,2n -o %s && gzip -c %s" 
+        #             %(self.input_file, self.cpus, self.input_file, self.input_file )]])
         job.run()
         
         # Clean
@@ -79,5 +82,5 @@ class PseudorepsGenerator:
          for dirs in self.inputs:
              yield [each for each
                     in os.listdir(os.path.join(self.out,dirs))
-                    if each.endswith('.bedpe')]
+                    if each.endswith('.bed')]
 

@@ -52,6 +52,8 @@ class Macs2PeakCaller():
         prefix =self.experiment_name.split("/")[-1]
         if prefix.endswith('.bedpe.gz'):
             prefix = prefix[:-9]
+        elif prefix.endswith('.bed.gz') :
+            prefix = prefix[:-7]
 
         narrowPeak_fn    = "%s/%s.narrowPeak" %(peaks_dirname, prefix)
         gappedPeak_fn    = "%s/%s.gappedPeak" %(peaks_dirname, prefix)
@@ -69,13 +71,13 @@ class Macs2PeakCaller():
 
         # Extract the fragment length estimate from \
         # column 3 of the cross-correlation scores file
-        if self.xcor_scores_input_name == "150":
-            fraglen=self.xcor_scores_input_name
-        else:
-            with open(self.xcor_scores_input_name,'r') as fh:
-                firstline = fh.readline()
-                fraglen = firstline.split()[2] #third column
-                print "Fraglen %s" %(fraglen)
+#        if self.xcor_scores_input_name == "150":
+        fraglen=self.xcor_scores_input_name
+#        else:
+#            with open(self.xcor_scores_input_name,'r') as fh:
+#                firstline = fh.readline()
+#                fraglen = firstline.split()[2] #third column
+#                print "Fraglen %s" %(fraglen)
         #===========================================
         command = '/home/matteie/Programs/macs2/bin/macs2 callpeak ' + \
                   '-t %s -c %s '\

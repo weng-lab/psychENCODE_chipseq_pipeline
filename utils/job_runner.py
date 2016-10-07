@@ -113,7 +113,8 @@ class JobRunner:
         if cpus:
             self.num_cores = cpus
         else:
-            self.num_cores = int(float(multiprocessing.cpu_count()) * fraction)
+#            self.num_cores = int(float(multiprocessing.cpu_count()) * fraction)
+            self.num_cores = 1
         self.scriptFnp = scriptFnp
         self.jobType = jobType
 
@@ -126,7 +127,10 @@ class JobRunner:
         if self.num_cores == 1:
             for idx, job in enumerate(self.jobs):
                 for cmd in job.arr:
-                    ret = [Utils.runCmds(cmd)[0]]
+                    if len(Utils.runCmds(cmd)) >= 1:
+                        ret = [Utils.runCmds(cmd)[0]]
+                    else:
+                        ret = ["finished"]
         else:
             total = len(self.jobs)
             ret = Parallel(n_jobs = self.num_cores)(delayed(runJob)(job, idx, total, False, func)

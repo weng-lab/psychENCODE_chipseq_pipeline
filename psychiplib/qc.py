@@ -82,7 +82,7 @@ class QC():
         job.append([[ command ]])
         job.run()
 
-        command = """bamToBed -bedpe -i %s | \
+        command = """bedtools bamtobed -bedpe -i %s | \
                      awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | \
                      grep -v 'chrM' | sort | uniq -c | \
                      awk 'BEGIN{mt=0;m0=0;m1=0;m2=0; OFS="\t"}

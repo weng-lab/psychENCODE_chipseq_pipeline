@@ -29,27 +29,26 @@ import utils.job_runner as jr
 
 class Overlap:
 
-    def __init__(self, arr_inputs, out_folder):
-        self.input_file = arr_inputs[0]
+    def __init__(self, prefix, out_folder):
+        self.input_file = prefix
         self.out = out_folder
-        #self.names = self.find_names()
 
     def run(self):
         job=jr.JobRunner()
         # narrowPeak
-        np_oracle = "%s/macs_%s/%s.narrowPeak.gz" %(self.out,self.input_file,self.input_file)
-        np_psr1 = "%s/macs_%s_psr_00/psr_%s.00.narrowPeak.gz"  %(self.out,self.input_file,self.input_file)
-        np_psr2 = "%s/macs_%s_psr_01/psr_%s.01.narrowPeak.gz"  %(self.out,self.input_file,self.input_file)
+        np_oracle = "%s/%s/macs_output/%s/%s.narrowPeak.gz" %(self.out,self.input_file,self.input_file,self.input_file)
+        np_psr1 = "%s/%s/macs_output/psr_%s.00/psr_%s.00.narrowPeak.gz"  %(self.out,self.input_file,self.input_file,self.input_file)
+        np_psr2 = "%s/%s/macs_output/psr_%s.01/psr_%s.01.narrowPeak.gz"  %(self.out,self.input_file,self.input_file,self.input_file)
 
         # broadPeak
-        bp_oracle = "%s/macs_%s/%s.broadPeak.gz"  %(self.out,self.input_file,self.input_file)
-        bp_psr1 = "%s/macs_%s_psr_00/psr_%s.00.broadPeak.gz"  %(self.out,self.input_file,self.input_file)
-        bp_psr2 = "%s/macs_%s_psr_01/psr_%s.01.broadPeak.gz"  %(self.out,self.input_file,self.input_file)
+        bp_oracle = "%s/%s/macs_output/%s/%s.broadPeak.gz"  %(self.out,self.input_file,self.input_file,self.input_file)
+        bp_psr1 = "%s/%s/macs_output/psr_%s.00/psr_%s.00.broadPeak.gz"  %(self.out,self.input_file,self.input_file,self.input_file)
+        bp_psr2 = "%s/%s/macs_output/psr_%s.01/psr_%s.01.broadPeak.gz"  %(self.out,self.input_file,self.input_file,self.input_file)
 
         # gappedPeak
-        gp_oracle = "%s/macs_%s/%s.gappedPeak.gz"  %(self.out,self.input_file,self.input_file)
-        gp_psr1 = "%s/macs_%s_psr_00/psr_%s.00.gappedPeak.gz"  %(self.out,self.input_file,self.input_file)
-        gp_psr2 = "%s/macs_%s_psr_01/psr_%s.01.gappedPeak.gz"  %(self.out,self.input_file,self.input_file)
+        gp_oracle = "%s/%s/macs_output/%s/%s.gappedPeak.gz"  %(self.out,self.input_file,self.input_file,self.input_file)
+        gp_psr1 = "%s/%s/macs_output/psr_%s.00/psr_%s.00.gappedPeak.gz"  %(self.out,self.input_file,self.input_file,self.input_file)
+        gp_psr2 = "%s/%s/macs_output/psr_%s.01/psr_%s.01.gappedPeak.gz"  %(self.out,self.input_file,self.input_file,self.input_file)
 
         job.append([["bedtools intersect \
                      -a %s -b %s -f 0.50 -F 0.50 -e |\
