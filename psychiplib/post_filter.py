@@ -110,7 +110,7 @@ class PostFilter():
         job.run()
 
 
-    def remove_artifacts(self, picard_jar, threads = 1, sponge=None):
+    def remove_artifacts(self, picard_jar, threads = 1, sponge = None):
         if not os.path.exists(self.flt_bam):
             raise Exception("filtered BAM file does not exist!")
 
@@ -126,7 +126,7 @@ class PostFilter():
                    + "VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=false"
         job.append([[ command ]])
         job.run()
-
+        
         job.append([[ "mv %s %s" %(tmp_bam, self.flt_bam) ]])
         job.run()
 

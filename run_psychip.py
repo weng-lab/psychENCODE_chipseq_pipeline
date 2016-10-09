@@ -40,6 +40,7 @@ idx = int(sys.argv[2])
 
 
 def run_main(inputs,idx):
+    
     ### ALIGN INPUT LIBRARIES
     run_map_input = mp.BwaMapper(inputs['inputs'][idx][0], # fastq read 1
                             inputs['inputs'][idx][1], # fastq read 2
@@ -150,7 +151,7 @@ def run_main(inputs,idx):
     ## Step 2: Compute library complexity
     test_qc.get_library_complexity("%s/%s/bwa_out/%s.flt.bam" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]), inputs['cpus']) # Threads for SAMtools
                                                               # Output: R1.libComplexity.QC.txt
-    '''
+    ''' 
     ## Step 3: *!NOT TESTED!* Cross correlation coefficient
     test_qc.cross_correlation("%s/%s/bwa_out/%s.bedpe.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]), # BEDPE file
                               "%s/common/run_spp_nodups.R" %(os.path.dirname(os.path.abspath(__file__))), # phantompeakqualtools
@@ -166,7 +167,7 @@ def run_main(inputs,idx):
     job.run()
 
     job.append([["grep -A2 \"## METRICS CLASS\" %s/%s/bwa_out/InsertSizeMetrics.txt | tail -1 | cut -f1" %(inputs['outdir'],inputs['prefix_inputs'][idx])]])
-    insert=job.run()[0]
+    insert=job.run()[0].rstrip()
 
     #run_filter_input.clean()
 
@@ -188,7 +189,7 @@ def run_main(inputs,idx):
                          insert,
                          "BEDPE",
                          "%s/%s/macs_output/%s" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
-                         inputs['genome'],"hs")
+                         inputs['genome'],"hs", inputs['macs2'],inputs['common'])
     run_peak.run()
 
     run_peak=pc.Macs2PeakCaller("%s/%s/macs_input/psr_%s.00.bedpe.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
@@ -197,7 +198,7 @@ def run_main(inputs,idx):
                          "BEDPE",
                          "%s/%s/macs_output/psr_%s.00" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
                          inputs['genome'],
-                         "hs")
+                         "hs", inputs['macs2'],inputs['common'])
     run_peak.run()
 
     run_peak=pc.Macs2PeakCaller("%s/%s/macs_input/psr_%s.01.bedpe.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
@@ -206,7 +207,7 @@ def run_main(inputs,idx):
                          "BEDPE",
                          "%s/%s/macs_output/psr_%s.01" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
                          inputs['genome'],
-                         "hs")
+                         "hs",inputs['macs2'],inputs['common'])
     run_peak.run()
 
 

@@ -28,7 +28,7 @@ import utils.job_runner as jr
 
 class Macs2PeakCaller():
     def __init__(self, experiment, control, xcor_scores_input,
-                     input_type, output_name, chrom_sizes, genomesize):
+                     input_type, output_name, chrom_sizes, genomesize, macs2, common):
         # Initialize data object inputs on the platform
 
         self.experiment_name = experiment
@@ -37,10 +37,12 @@ class Macs2PeakCaller():
         self.input_type = input_type
         self.output_name = output_name
         self.genomesize = genomesize
-        self.narrowPeak_as_name = "./common/narrowPeak.as"
-        self.gappedPeak_as_name = "./common/gappedPeak.as"
-        self.broadPeak_as_name = "./common/broadPeak.as"
-        self.chrom_sizes_name = chrom_sizes 
+        self.narrowPeak_as_name = os.path.join(common,"narrowPeak.as")
+        self.gappedPeak_as_name = os.path.join(common,"gappedPeak.as")
+        self.broadPeak_as_name = os.path.join(common,"broadPeak.as")
+        self.chrom_sizes_name = chrom_sizes
+        self.macs2 = macs2
+        self.common = common
 
     def run(self):
         job=jr.JobRunner()
@@ -79,7 +81,7 @@ class Macs2PeakCaller():
 #                fraglen = firstline.split()[2] #third column
 #                print "Fraglen %s" %(fraglen)
         #===========================================
-        command = '/home/matteie/Programs/macs2/bin/macs2 callpeak ' + \
+        command = '%s callpeak '%(self.macs2) + \
                   '-t %s -c %s '\
                    %(self.experiment_name, self.control_name) + \
                   '-f %s -n %s/%s '\
@@ -119,7 +121,7 @@ class Macs2PeakCaller():
         #===========================================
         # Generate Broad and Gapped Peaks
         #============================================
-        command = '/home/matteie/Programs/macs2/bin/macs2 callpeak ' + \
+        command = '%s callpeak ' %(self.macs2) + \
                   '-t %s -c %s ' \
                   %(self.experiment_name, self.control_name) + \
                   '-f %s -n %s/%s '%(self.input_type, 
@@ -127,7 +129,7 @@ class Macs2PeakCaller():
                   '-g %s -p 1e-2 --broad --nomodel --shift 0 \
                   --extsize %s --keep-dup all' \
                   %(self.genomesize, fraglen)
-        print command
+        #print command
         job.append([["%s" %(command)]])
         job.run()
         # Rescale Col5 scores to range 10-1000 to conform to narrowPeak.as format (score must be <1000)
@@ -140,7 +142,7 @@ class Macs2PeakCaller():
                    tee %s | gzip -c > %s"%(rescaled_broadpeak_fn, 
                                            broadPeak_fn,
                                            self.broadPeak_gz_fn)
-        print command
+        #print command
 
         job.append([["%s" %(command)]])
         job.run()
@@ -155,7 +157,7 @@ class Macs2PeakCaller():
                    tee %s | gzip -c > %s"%(rescaled_gappedpeak_fn,\
                                            gappedPeak_fn,
                                            self.gappedPeak_gz_fn)
-        print command
+        #print command
 
         job.append([["%s" %(command)]])
         job.run()
@@ -168,29 +170,29 @@ class Macs2PeakCaller():
         # For Fold enrichment signal tracks
         #============================================
         # This file is a tab delimited file with 2 columns Col1 (chromosome name), Col2 (chromosome size in bp).
-        command = '/home/matteie/Programs/macs2/bin/macs2 bdgcmp '+ \
+        command = '%s bdgcmp ' %(self.macs2) + \
                   '-t %s/%s_treat_pileup.bdg ' %(peaks_dirname, prefix) + \
                   '-c %s/%s_control_lambda.bdg ' %(peaks_dirname, prefix) + \
                   '--outdir %s -o %s_FE.bdg ' %(peaks_dirname, prefix) + \
                   '-m FE'
-        print command
+        #print command
 
         job.append([["%s" %(command)]])
         job.run()
         # Remove coordinates outside chromosome sizes (stupid MACS2 bug)
         job.append([["bedtools slop -i %s/%s_FE.bdg -g %s -b 0 |\
-                    ./common/bedClip stdin %s %s/%s.fc.signal.bedgraph"
-                    %(peaks_dirname, prefix, self.chrom_sizes_name, 
+                    %s/bedClip stdin %s %s/%s.fc.signal.bedgraph"
+                    %(peaks_dirname, prefix, self.chrom_sizes_name, self.common, 
                       self.chrom_sizes_name, peaks_dirname, prefix)]])
-        print command
+        #print command
         job.run()
 
         #rm -f ${PEAK_OUTPUT_DIR}/${CHIP_TA_PREFIX}_FE.bdg
         # Convert bedgraph to bigwig
-        command = './common/bedGraphToBigWig ' + \
+        command = '%s/bedGraphToBigWig '%(self.common) + \
                   '%s/%s.fc.signal.bedgraph ' %(peaks_dirname, prefix)+\
                   '%s %s' %(self.chrom_sizes_name, self.fc_signal_fn)
-        print command
+        #print command
         job.append([["%s" %(command)]])
         job.run()
 
@@ -211,10 +213,10 @@ class Macs2PeakCaller():
             job.append([["samtools idxstats %s | awk '{sum=sum+$3}END{print sum}'"%(self.control_name)]])
             controlReads = int(job.run()[0])
             sval=str(min(float(chipReads), float(controlReads))/1000000)
-            print sval,chipReads,controlReads
+        #    print sval,chipReads,controlReads
         print "chipReads = %s, controlReads = %s, sval = %s" %(chipReads, controlReads, sval)
 
-        job.append([['/home/matteie/Programs/macs2/bin/macs2 bdgcmp ' + \
+        job.append([['%s bdgcmp ' %(self.macs2) + \
                 '-t %s/%s_treat_pileup.bdg ' %(peaks_dirname, prefix) + \
                 '-c %s/%s_control_lambda.bdg ' %(peaks_dirname, prefix) + \
                 '--outdir %s -o %s_ppois.bdg ' %(peaks_dirname, prefix) + \
@@ -222,16 +224,16 @@ class Macs2PeakCaller():
         job.run()
         # Remove coordinates outside chromosome sizes (stupid MACS2 bug)
         job.append([['bedtools slop -i %s/%s_ppois.bdg -g %s -b 0' 
-                   %(self.chrom_sizes_name,peaks_dirname, prefix)+ \
-                '| ./common/bedClip stdin %s %s/%s.pval.signal.bedgraph'
-                 %(self.chrom_sizes_name,peaks_dirname, prefix)]])
+                   %(peaks_dirname, prefix, self.chrom_sizes_name)+ \
+                '| %s/bedClip stdin %s %s/%s.pval.signal.bedgraph'
+                 %(self.common, self.chrom_sizes_name,peaks_dirname, prefix)]])
         job.run()
 
         job.append([["rm -rf %s/%s_ppois.bdg" %(peaks_dirname,prefix)]])
         job.run()
 
         # Convert bedgraph to bigwig
-        command = './bedGraphToBigWig ' + \
+        command = '%s/bedGraphToBigWig ' %(self.common) + \
         '%s/%s.pval.signal.bedgraph ' %(peaks_dirname, prefix) + \
         '%s %s' %(self.chrom_sizes_name, self.pvalue_signal_fn)
 

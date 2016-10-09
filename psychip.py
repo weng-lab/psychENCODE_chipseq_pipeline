@@ -78,12 +78,12 @@ def check_requirements():
         checker.which('R')
         #check sort version
         #check samtools version
-        #check ('java -jar picard.jar') #How to check this properly?
     except Exception as e:
         raise(e) 
     
 
 def check_arguments(args):
+    checker=u.Utils()
     inputs = {}
     try:
         # Check if the input files exist and are well formatted
@@ -122,17 +122,28 @@ def check_arguments(args):
         else:
             inputs['sponges'] = None
 
-        
-
-        if not os.path.exists(args['picard']):
-            raise Exception("Picard not found in '%s'" %(args['picard']))
+        if args['macs2'] != None:
+            if os.path.exists(args['macs2']):
+                inputs['macs2'] = args['macs2']
+            else:
+                raise Exception("Macs2 not found in '%s'" %(args['macs2']))
         else:
+            try:
+                checker.which('macs2')
+                inputs['macs2'] = "macs2"
+            except Exception as e:
+                raise(e)
+
+#        if not os.path.exists(args['picard']):
+#            raise Exception("Picard not found in '%s'" %(args['picard']))
+#        else:
             inputs['picard'] = args['picard']
         
         
         inputs['threads'] = args['t']
         inputs['cpus'] = args['c']
-        
+        inputs['common'] = os.path.join(os.path.dirname(os.path.abspath(__file__)),"common") 
+        inputs['picard'] = os.path.join(os.path.dirname(os.path.abspath(__file__)),"common/picard-tools-1.141/picard.jar") 
         
         # If not enough controls are supplied, use pooled controls.
         if len(inputs['inputs']) != len(inputs['controls']):
@@ -158,21 +169,21 @@ def main(inputs):
     print("--- Welcome to the pipeline ---")
     if inputs['pooled']:
         print("Warning : The controls libraries will be pooled together.")
+        
         for idx in range(len(inputs['inputs'])):
-            job.append([["python run_psychip.py map %s inputs" %(idx)]])
+            job.append([["python run_psychip_pool_input.py %s/inputs.json map %s inputs" %(inputs['outdir'], idx)]])
         for idx in range(len(inputs['controls'])):
-            job.append([["python run_psychip.py map %s controls" %(idx)]])
+            job.append([["python run_psychip_pool_input.py %s/inputs.json map %s controls" %(inputs['outdir'], idx)]])
         job.run()
-
-        job.append([["python run_psychip.py pooling"]])
+        
+        job.append([["python run_psychip_pool_input.py %s/inputs.json pooling" %(inputs['outdir'])]])
         job.run()
-
-        for idx in range(len(inputs['inputs'])):
-            job.append([["python run_psychip.py peak %s" %(idx)]])
+        for idx in range(len(inputs['inputs']) + 1): # the plus one is for the pooled input
+            job.append([["python run_psychip_pool_input.py %s/inputs.json peak %s" %(inputs['outdir'], idx)]])
+        
         job.run()
     else:
         for idx in range(len(inputs['inputs'])):
-            #job.append([["python run_psychip.py complete %s" %(idx)]])
             job.append([["python run_psychip.py %s/inputs.json %s" %(inputs['outdir'], idx)]])
         job.run()
 
@@ -197,7 +208,9 @@ if __name__ == "__main__":
                                #threads * #cpus.""")
     parser.add_argument('--sponges', metavar = 'FILE', help = "Sponges file used to \
                                              remove sequences")
-    parser.add_argument('--picard', metavar = 'FILE', help = "Location of picard.jar package e.g. \(/home/user/picard-tools-1.141/picard.jar\)")
+   # parser.add_argument('--picard', metavar = 'FILE', required = True, help = "Location of picard.jar package e.g. (/home/user/picard-tools-1.141/picard.jar)")
+    parser.add_argument('--spp', action='store_true', help = "Compute Metrics for input file using SPP package (requires SPP package)")
+    parser.add_argument('--macs2', metavar = 'FILE', help = "Location of macs2 executable e.g. (/home/user/macs2/bin/macs2)")
     #parser.add_argument('--single', help = "If the library is \
     #                                        single-end")
     #parser.add_argument('--cluster', help = "#developping")
