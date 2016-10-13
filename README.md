@@ -66,7 +66,7 @@ In the above scenario each ip library has its own input that will be used during
    |-----------|-----------|-------------|-------------|
    |  /home/path/to/syn00001.R1.fastq.gz | /home/path/to/syn00001.R2.fastq.gz | /home/path/to/syn00001.input.R1.fastq.gz | /home/path/to/syn00001.input.R1.fastq.gz |
    |  /home/path/to/syn00002.R1.fastq.gz | /home/path/to/syn00002.R2.fastq.gz | /home/path/to/syn00002.input.R1.fastq.gz | /home/path/to/syn00002.input.R1.fastq.gz |
-   |  /home/path/to/syn00003.R1.fastq.gz | /home/path/to/syn00003.R2.fastq.gz ||| 
+   |  /home/path/to/syn00003.R1.fastq.gz | /home/path/to/syn00003.R2.fastq.gz |||
    |  /home/path/to/syn00004.R1.fastq.gz | /home/path/to/syn00004.R2.fastq.gz ||| 
    
 In the above example input libraries are missing for syn00003 and syn00004. Therefore, syn00001.input and syn00002.control will be pooled together and used for all the ips.
@@ -75,6 +75,7 @@ In the above example input libraries are missing for syn00003 and syn00004. Ther
 ## Output file formats
 
 Considering as inputfile for psychip:
+
     | ip.R1 | ip.R2 | input1.R1 | input2.R2 |
     |-----------|-----------|-------------|-------------|
     |  /home/path/to/syn00001.R1.fastq.gz | /home/path/to/syn00001.R2.fastq.gz | /home/path/to/syn00001.input.R1.fastq.gz | /home/path/to/syn00001.input.R1.fastq.gz |
