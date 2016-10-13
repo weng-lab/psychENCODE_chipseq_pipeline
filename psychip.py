@@ -137,8 +137,27 @@ def check_arguments(args):
 #        if not os.path.exists(args['picard']):
 #            raise Exception("Picard not found in '%s'" %(args['picard']))
 #        else:
-            inputs['picard'] = args['picard']
-        
+#            inputs['picard'] = args['picard']
+        inputs['fraglen'] = -1
+        if args['fraglen'] != None:
+            if args['spp']:
+                raise Exception("'--spp' and '--fraglen' are mutually exclusive. Please select only one.")
+            else:
+                inputs['fraglen'] = args['fraglen']
+        else:
+            if args['spp']:
+                try:
+                    j = jr.JobRunner()
+                    j.append([['Rscript ./common/test.R']])
+                    j.run()
+                    inputs['spp'] = True
+                except:
+                   raise Exception("Spp is not currently installed or cannot be loaded.")
+            else:
+                inputs['spp'] = False
+                inputs['fraglen'] = -1
+                print('Picard tools will be used to estimate insert size.')
+                
         
         inputs['threads'] = args['t']
         inputs['cpus'] = args['c']
@@ -180,18 +199,21 @@ def main(inputs):
         job.run()
         for idx in range(len(inputs['inputs']) + 1): # the plus one is for the pooled input
             job.append([["python run_psychip_pool_input.py %s/inputs.json peak %s" %(inputs['outdir'], idx)]])
-        
         job.run()
     else:
         for idx in range(len(inputs['inputs'])):
             job.append([["python run_psychip.py %s/inputs.json %s" %(inputs['outdir'], idx)]])
+        job.run()
+        job.append([["python run_psychip_pool_input.py %s/inputs.json pooling" %(inputs['outdir'])]])
+        job.run()
+        job.append([["python run_psychip_pool_input.py %s/inputs.json peak %s" %(inputs['outdir'], len(inputs['inputs'])+1)]])
         job.run()
 
 
 if __name__ == "__main__":
     usage = """psychip [options] -b <bowtie_index> -g <genome_chrInfo> -f <input_file> -o <output_folder>"""
     description = "Histone ChIP-seq processing pipeline based on \
-                   the ENCODE(phase-3) with support for paired-end \
+                   the ENCODE with support for paired-end \
                    reads and multiple replicates."
 
     parser = argparse.ArgumentParser(usage = usage, description=description, prog="psychip")
@@ -203,13 +225,13 @@ if __name__ == "__main__":
     parser.add_argument('-g', metavar = 'FILE', required = True,  help = "ChromInfo file for the genome")
     parser.add_argument('-t', metavar = 'INT', type = int,  default=1, help = "Number of threads")
     parser.add_argument('-c', metavar = 'INT', type = int,  default=1, \
-                        help = """Number of cpus per thread. \
+                        help = "Number of cpus per thread. \
                                Total number of cpus used = \
-                               #threads * #cpus.""")
+                               #threads * #cpus.")
     parser.add_argument('--sponges', metavar = 'FILE', help = "Sponges file used to \
                                              remove sequences")
-   # parser.add_argument('--picard', metavar = 'FILE', required = True, help = "Location of picard.jar package e.g. (/home/user/picard-tools-1.141/picard.jar)")
     parser.add_argument('--spp', action='store_true', help = "Compute Metrics for input file using SPP package (requires SPP package)")
+    parser.add_argument('--fraglen', metavar = 'INT', help = "Insert size for paired end reads")
     parser.add_argument('--macs2', metavar = 'FILE', help = "Location of macs2 executable e.g. (/home/user/macs2/bin/macs2)")
     #parser.add_argument('--single', help = "If the library is \
     #                                        single-end")

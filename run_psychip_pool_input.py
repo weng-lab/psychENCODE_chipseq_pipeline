@@ -30,6 +30,7 @@ import psychiplib.qc as qc
 import psychiplib.pseudoreps as psr
 import psychiplib.peak_calling as pc
 import psychiplib.overlap as ovrlp
+import psychiplib.xcor as xcor
 import traceback
 
 
@@ -94,23 +95,32 @@ def map_inputs(inputs,idx):
     ## Step 2: Compute library complexity
     test_qc.get_library_complexity("%s/%s/bwa_out/%s.flt.bam" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]), inputs['cpus']) # Threads for SAMtools
                                                               # Output: R1.libComplexity.QC.txt
-    ''' 
-    ## Step 3: *!NOT TESTED!* Cross correlation coefficient
-    test_qc.cross_correlation("%s/%s/bwa_out/%s.bedpe.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]), # BEDPE file
-                              "%s/common/run_spp_nodups.R" %(os.path.dirname(os.path.abspath(__file__))), # phantompeakqualtools
-                              inputs['cpus'])                                      # Number of CPU for phantompeakqualtools
-    '''
-    job=jr.JobRunner()
-    insert = 150
-    job.append([["java -jar %s CollectInsertSizeMetrics I=%s/%s/bwa_out/%s.final.bam\
-                  O=%s/%s/bwa_out/InsertSizeMetrics.txt AS=F H=%s/%s/bwa_out/InsertSizeMetrics.histogram" \
-                  %(inputs['picard'],inputs['outdir'],inputs['prefix_inputs'][idx],inputs['prefix_inputs'][idx],\
-                    inputs['outdir'],inputs['prefix_inputs'][idx],\
-                    inputs['outdir'],inputs['prefix_inputs'][idx])]])
-    job.run()
-
-    job.append([["grep -A2 \"## METRICS CLASS\" %s/%s/bwa_out/InsertSizeMetrics.txt | tail -1 | cut -f1" %(inputs['outdir'],inputs['prefix_inputs'][idx])]])
-    insert=job.run()[0].rstrip()
+    ## Find insert size
+    job = jr.JobRunner()
+    if inputs['fraglen'] > 0:
+        insert = inputs['fraglen']
+        
+    elif inputs['spp']:
+        ### Find insert size
+        input_xcor = xcor.Xcor("%s/%s/bwa_out/%s.final.bam" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
+                                  "%s/common/run_spp_nodups.R" %(os.path.dirname(os.path.abspath(__file__))),
+                                  inputs['cpus'])
+        input_xcor.process()
+        job.append([["cat %s/%s/bwa_out/*.cc.qc | cut -f3" %(inputs['outdir'],inputs['prefix_inputs'][idx])]])
+        insert = job.run()[0].rstrip()
+        #with open(,'r') as fh:
+        #    firstline = fh.readline()
+        #    insert = firstline.split()[2] #third column
+        
+    else:
+        job.append([["java -jar %s CollectInsertSizeMetrics I=%s/%s/bwa_out/%s.final.bam\
+                      O=%s/%s/bwa_out/InsertSizeMetrics.txt AS=F H=%s/%s/bwa_out/InsertSizeMetrics.histogram" \
+                      %(inputs['picard'],inputs['outdir'],inputs['prefix_inputs'][idx],inputs['prefix_inputs'][idx],\
+                        inputs['outdir'],inputs['prefix_inputs'][idx],\
+                        inputs['outdir'],inputs['prefix_inputs'][idx])]])
+        job.run()
+        job.append([["grep -A2 \"## METRICS CLASS\" %s/%s/bwa_out/InsertSizeMetrics.txt | tail -1 | cut -f1" %(inputs['outdir'],inputs['prefix_inputs'][idx])]])
+        insert = job.run()[0].rstrip()
 
     run_filter_input.clean()
 
@@ -174,6 +184,38 @@ def map_controls(inputs, idx):
     if not os.path.isfile("%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx])):
         shutil.move("%s/%s/bwa_out/%s.bed.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]),\
                "%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]))
+    ### QC part CONTROL LIBRARIES
+    control_qc = qc.QC("%s/%s/bwa_out/" %(inputs['outdir'], inputs['prefix_controls'][idx])) # output direcotry
+
+    ## Step 1: Get map stats
+    control_qc.get_mapstats("%s/%s/bwa_out/%s.raw.bam" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]),
+                         "%s/%s/bwa_out/%s.final.bam" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx])) # Output: R1.final.flagstat.QC.txt
+
+    ## Step 2: Compute library complexity
+    control_qc.get_library_complexity("%s/%s/bwa_out/%s.flt.bam" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]), inputs['cpus']) # Threads for SAMtools
+    
+    job = jr.JobRunner()
+
+    if inputs['fraglen'] > 0:
+        insert = inputs['fraglen']
+        
+    elif inputs['spp']:
+        ### Find insert size
+        control_xcor = xcor.Xcor("%s/%s/bwa_out/%s.final.bam" %(inputs['outdir'], inputs['prefix_controls'][idx], inputs['prefix_controls'][idx]),
+                                  "%s/common/run_spp_nodups.R" %(os.path.dirname(os.path.abspath(__file__))),
+                                  inputs['cpus'])
+        control_xcor.process()
+        #with open(,'r') as fh:
+        #    firstline = fh.readline()
+        #    insert = firstline.split()[2] #third column
+        
+    else:
+        job.append([["java -jar %s CollectInsertSizeMetrics I=%s/%s/bwa_out/%s.final.bam\
+                      O=%s/%s/bwa_out/InsertSizeMetrics.txt AS=F H=%s/%s/bwa_out/InsertSizeMetrics.histogram" \
+                      %(inputs['picard'],inputs['outdir'],inputs['prefix_controls'][idx],inputs['prefix_controls'][idx],\
+                        inputs['outdir'],inputs['prefix_controls'][idx],\
+                        inputs['outdir'],inputs['prefix_controls'][idx])]])
+        job.run()
     run_filter_control.clean()
 
 
@@ -198,10 +240,15 @@ def pool_libraries(inputs):
 
 
 def peak(inputs, idx):
-    print("SONOQUIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII")
     job=jr.JobRunner()
-    job.append([["grep -A2 \"## METRICS CLASS\" %s/%s/bwa_out/InsertSizeMetrics.txt | tail -1 | cut -f1" %(inputs['outdir'],inputs['prefix_inputs'][idx])]])
-    insert=job.run()[0].rstrip()
+    if inputs['fraglen'] > 0:
+        insert = inputs['fraglen']
+    elif inputs['spp']:
+        job.append([["cat %s/%s/bwa_out/*.cc.qc | cut -f3" %(inputs['outdir'],inputs['prefix_inputs'][idx])]])
+        insert = job.run()[0].rstrip()
+    else:
+        job.append([["grep -A2 \"## METRICS CLASS\" %s/%s/bwa_out/InsertSizeMetrics.txt | tail -1 | cut -f1" %(inputs['outdir'],inputs['prefix_inputs'][idx])]])
+        insert = job.run()[0].rstrip()
     ### PEAK
     run_peak=pc.Macs2PeakCaller("%s/%s/macs_input/%s.bed.gz" %(inputs['outdir'], inputs['prefix_inputs'][idx], inputs['prefix_inputs'][idx]),
                          "%s/oracle_peaks/pooled_controls.bed.gz" %(inputs['outdir']),
@@ -235,11 +282,18 @@ def peak(inputs, idx):
 
 def peak_oracle(inputs):
     insert = 0
-    job=jr.JobRunner()
-    for prefix in inputs['prefix_inputs']:
-        job.append([["grep -A2 \"## METRICS CLASS\" %s/%s/bwa_out/InsertSizeMetrics.txt | tail -1 | cut -f1" %(inputs['outdir'], prefix)]])
-        insert = insert + int(job.run()[0].rstrip())
-    insert = insert/len(inputs['prefix_inputs'])
+    if inputs['fraglen'] > 0 :
+        insert = inputs['fraglen']
+    else:
+        job=jr.JobRunner()
+        for prefix in inputs['prefix_inputs']:
+            if inputs['spp']:
+                job.append([["cat %s/%s/bwa_out/*.cc.qc | cut -f3" %(inputs['outdir'], prefix)]])
+                insert = insert + int(job.run()[0].rstrip())
+            else:
+                job.append([["grep -A2 \"## METRICS CLASS\" %s/%s/bwa_out/InsertSizeMetrics.txt | tail -1 | cut -f1" %(inputs['outdir'], prefix)]])
+                insert = insert + int(job.run()[0].rstrip())
+        insert = insert/len(inputs['prefix_inputs'])
 
     ### PEAK
     run_peak=pc.Macs2PeakCaller("%s/oracle_peaks/pooled_inputs.bed.gz" %(inputs['outdir']),

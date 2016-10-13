@@ -43,7 +43,7 @@ class PseudorepsGenerator:
         print("Shuffle input")
         shuf_out = os.path.join(self.out,
                                 "shuf_%s.bedpe" %(self.prefix))
-        job.append([["zcat %s | shuf > %s" %(self.input_file,shuf_out)]])
+        job.append([["zcat %s | shuf --random-source=%s > %s" %(self.input_file, self.input_file, shuf_out)]])
         job.run()
 
         # Split into two files
