@@ -85,16 +85,12 @@ psychip will produce for each library 3 files containing narrow peaks, gapped pe
 
 e.g.
 
-/home/path/to/outdir/syn00001.R1.narrowPeak\
+/home/path/to/outdir/syn00001.R1.narrowPeak
+/home/path/to/outdir/syn00001.R1.broadPeak
+/home/path/to/outdir/syn00001.R1.gappedPeak
 
-/home/path/to/outdir/syn00001.R1.broadPeak\
-
-/home/path/to/outdir/syn00001.R1.gappedPeak\
-
-/home/path/to/outdir/syn00002.R1.narrowPeak\
-
-/home/path/to/outdir/syn00002.R1.broadPeak\
-
+/home/path/to/outdir/syn00002.R1.narrowPeak
+/home/path/to/outdir/syn00002.R1.broadPeak
 /home/path/to/outdir/syn00002.R1.gappedPeak
 
 
