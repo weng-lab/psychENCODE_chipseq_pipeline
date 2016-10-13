@@ -61,13 +61,14 @@ $ python psychip.py -f test/inputfile2 -o .test/output -b your_bwa_index -g your
    |  /home/path/to/syn00004.R1.fastq.gz | /home/path/to/syn00004.R2.fastq.gz | /home/path/to/syn00004.input.R1.fastq.gz | /home/path/to/syn00004.input.R1.fastq.gz |
    
 In the above scenario each ip library has its own input that will be used during the peak calling procedure. In case controls are not available for all the ips it is possible to omit the last two columns. If so, the all the inputs will be pooled togehter and used for all the ips
+
     
    | ip.R1 | ip.R2 | input1.R1 | input2.R2 |
    |-----------|-----------|-------------|-------------|
    |  /home/path/to/syn00001.R1.fastq.gz | /home/path/to/syn00001.R2.fastq.gz | /home/path/to/syn00001.input.R1.fastq.gz | /home/path/to/syn00001.input.R1.fastq.gz |
    |  /home/path/to/syn00002.R1.fastq.gz | /home/path/to/syn00002.R2.fastq.gz | /home/path/to/syn00002.input.R1.fastq.gz | /home/path/to/syn00002.input.R1.fastq.gz |
-   |  /home/path/to/syn00003.R1.fastq.gz | /home/path/to/syn00003.R2.fastq.gz |||
-   |  /home/path/to/syn00004.R1.fastq.gz | /home/path/to/syn00004.R2.fastq.gz ||| 
+   |  /home/path/to/syn00003.R1.fastq.gz | /home/path/to/syn00003.R2.fastq.gz | | |
+   |  /home/path/to/syn00004.R1.fastq.gz | /home/path/to/syn00004.R2.fastq.gz | | |
    
 In the above example input libraries are missing for syn00003 and syn00004. Therefore, syn00001.input and syn00002.control will be pooled together and used for all the ips.
    
@@ -83,12 +84,14 @@ Considering as inputfile for psychip:
 
 
 psychip will produce for each library 3 files containing narrow peaks, gapped peaks and broad peaks.
+
 e.g.
-/home/path/to/outdir/syn00001.R1.narrowPeak
-/home/path/to/outdir/syn00001.R1.broadPeak
-/home/path/to/outdir/syn00001.R1.gappedPeak
-/home/path/to/outdir/syn00002.R1.narrowPeak
-/home/path/to/outdir/syn00002.R1.broadPeak
+
+/home/path/to/outdir/syn00001.R1.narrowPeak\
+/home/path/to/outdir/syn00001.R1.broadPeak\
+/home/path/to/outdir/syn00001.R1.gappedPeak\
+/home/path/to/outdir/syn00002.R1.narrowPeak\
+/home/path/to/outdir/syn00002.R1.broadPeak\
 /home/path/to/outdir/syn00002.R1.gappedPeak
 
 
