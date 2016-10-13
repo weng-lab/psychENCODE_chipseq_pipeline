@@ -99,6 +99,7 @@ e.g.
 * Add support for other organisms (right now works only with human)
 * Add checkpoint to re-run just a part of the pipeline
 * Use BAMPE input instead of BEDPE in order to use other peak caller
+* Add check for sort and samtools versions
 
 ## References
 
