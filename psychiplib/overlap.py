@@ -50,6 +50,17 @@ class Overlap:
         gp_psr1 = "%s/%s/macs_output/psr_%s.00/psr_%s.00.gappedPeak.gz"  %(self.out,self.input_file,self.input_file,self.input_file)
         gp_psr2 = "%s/%s/macs_output/psr_%s.01/psr_%s.01.gappedPeak.gz"  %(self.out,self.input_file,self.input_file,self.input_file)
 
+        
+        if not os.path.isdir("%s/gappedPeaks/" %(self.out)):
+            os.mkdir("%s/gappedPeaks/" %(self.out))
+        
+        if not os.path.isdir("%s/broadPeaks/" %(self.out)):
+            os.mkdir("%s/broadPeaks/" %(self.out))
+        
+        if not os.path.isdir("%s/narrowPeaks/" %(self.out)):
+            os.mkdir("%s/narrowPeaks/" %(self.out))
+        
+
         job.append([["bedtools intersect \
                      -a %s -b %s -f 0.50 -F 0.50 -e |\
                      bedtools intersect \
