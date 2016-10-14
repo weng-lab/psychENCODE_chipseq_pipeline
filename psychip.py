@@ -54,6 +54,8 @@ def input_integrity(input_file):
                         controls.append([files[2], files[3]])
                         prefix_controls.append(extract_prefix(files[2]))
                     count = count+1
+        if len(controls) == 0:
+            raise Exception("No controls libraries were found. Please check you input")
         print("Input Integrity Verification Completed")
     except Exception as e:
         raise(e)
