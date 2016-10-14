@@ -44,7 +44,7 @@ def input_integrity(input_file):
                     for filename in files:
                         test = test + os.path.isfile(filename)
                     
-                    if test %2 != 0:
+                    if test %2 != 0 or test == 0:
                         raise Exception("One or more files in line %s don't exist. Please check your input" %(str(count)))
                     
                     inputs.append([files[0], files[1]])

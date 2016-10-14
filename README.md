@@ -43,7 +43,10 @@ Usage: `python psychip.py -f test/inputfile -o outputdir -b /home/path/to/hg38 -
 
 ## Test
 
-You can test the pipeline by entering the main project folder and run
+To test the installation please dowload the example files from :
+https://zlab.umassmed.edu/~matteie/psychip_test_files.tar.gz
+
+Extract the folder into the psychip main folder and run
 ```
 $ python psychip.py -f test/inputfile2 -o .test/output -b your_bwa_index -g your_genome_file
 ```
