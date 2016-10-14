@@ -53,23 +53,23 @@ class Overlap:
         job.append([["bedtools intersect \
                      -a %s -b %s -f 0.50 -F 0.50 -e |\
                      bedtools intersect \
-                     -a stdin -b %s -f 0.50 -F 0.50 -e > \
-                     %s/%s.final.narrowPeak.gz"\
+                     -a stdin -b %s -f 0.50 -F 0.50 -e -u> \
+                     %s/narrowPeaks/%s.final.narrowPeak.gz"\
                      %(np_oracle,np_psr1,np_psr2, \
                        self.out, self.input_file)]])
 
         job.append([["bedtools intersect \
                      -a %s -b %s -f 0.50 -F 0.50 -e |\
                      bedtools intersect \
-                     -a stdin -b %s -f 0.50 -F 0.50 -e > \
-                     %s/%s.final.broadPeak.gz"\
+                     -a stdin -b %s -f 0.50 -F 0.50 -e -u > \
+                     %s/broadPeaks/%s.final.broadPeak.gz"\
                      %(bp_oracle,bp_psr1,np_psr2, \
                        self.out, self.input_file)]])
         job.append([["bedtools intersect \
                      -a %s -b %s -f 0.50 -F 0.50 -e |\
                      bedtools intersect \
-                     -a stdin -b %s -f 0.50 -F 0.50 -e > \
-                     %s/%s.final.gappedPeak.gz"\
+                     -a stdin -b %s -f 0.50 -F 0.50 -e -u > \
+                     %s/gappedPeaks/%s.final.gappedPeak.gz"\
                      %(gp_oracle,gp_psr1,np_psr2, \
                        self.out, self.input_file)]])
         job.run()
