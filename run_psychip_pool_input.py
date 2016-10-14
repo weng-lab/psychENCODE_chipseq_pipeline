@@ -228,12 +228,10 @@ def pool_libraries(inputs):
     for prefix in inputs['prefix_inputs']:
         cmd_inputs = cmd_inputs + "%s/%s/macs_input/%s.bed.gz " %(inputs['outdir'], prefix, prefix)
     cmd_inputs = cmd_inputs + "| sort --parallel=%s -k1,1 -k2,2n | gzip -c > %s/oracle_peaks/pooled_inputs.bed.gz" %(inputs['cpus'], inputs['outdir'])
-    print(cmd_inputs)
     cmd_controls = "zcat "
     for prefix in inputs['prefix_controls']:
         cmd_controls = cmd_controls + "%s/%s/macs_input/%s.bed.gz " %(inputs['outdir'], prefix, prefix) 
     cmd_controls = cmd_controls + "| sort --parallel=%s -k1,1 -k2,2n | gzip -c > %s/oracle_peaks/pooled_controls.bed.gz" %(inputs['cpus'], inputs['outdir'])    
-    print(cmd_controls)
     job.append([[ cmd_controls ]])
     job.append([[ cmd_inputs  ]])
     job.run()
