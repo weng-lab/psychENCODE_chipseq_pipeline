@@ -37,12 +37,7 @@ try:
     import requests
     import dateutil.parser
 except:
-    from files_and_paths import Dirs
-    sys.path.append(Dirs.ToolsFnp("python2.7"))
-    import requests
-    from requests.auth import HTTPBasicAuth
-    import dateutil.parser
-
+    raise Exception("python packages: HTTPBasicAuth, requests, dateutil.parser are not present. Please install those and try again.")
 def printWroteNumLines(fnp):
     print("\twrote", fnp, '(' + "{:,}".format(numLines(fnp)) +' lines)')
 

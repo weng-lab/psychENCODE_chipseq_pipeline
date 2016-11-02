@@ -26,9 +26,7 @@ import os, sys, json, traceback
 try:
     from joblib import Parallel, delayed
 except:
-    from files_and_paths import Dirs
-    sys.path.append(Dirs.ToolsFnp('python2.7'))
-    from joblib import Parallel, delayed
+    raise Exception("Please install Parallel and Delayed packages for python")
 import multiprocessing
 
 from utils import Utils
