@@ -26,7 +26,7 @@ import os, sys, json, traceback
 try:
     from joblib import Parallel, delayed
 except:
-    raise Exception("Please install Parallel and Delayed packages for python")
+    raise Exception("Please install joblib package for python")
 import multiprocessing
 
 from utils import Utils
