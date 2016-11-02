@@ -44,7 +44,7 @@ Usage: `python psychip.py -f test/inputfile -o outputdir -b /home/path/to/hg38 -
 ## Test
 
 To test the installation please dowload the example files from :
-https://zlab.umassmed.edu/~matteie/psychip_test_files.tar.gz
+https://zlab.umassmed.edu/~matteie/psychip/psychip_test_files.tar.gz
 
 Extract the folder into the psychip main folder and run
 ```
