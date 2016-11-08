@@ -192,23 +192,23 @@ def main(inputs):
         print("Warning : The controls libraries will be pooled together.")
         
         for idx in range(len(inputs['inputs'])):
-            job.append([["python run_psychip_pool_input.py %s/inputs.json map %s inputs" %(inputs['outdir'], idx)]])
+            job.append([["python %s/run_psychip_pool_input.py %s/inputs.json map %s inputs" %(os.path.dirname(os.path.abspath(__file__)), inputs['outdir'], idx)]])
         for idx in range(len(inputs['controls'])):
-            job.append([["python run_psychip_pool_input.py %s/inputs.json map %s controls" %(inputs['outdir'], idx)]])
+            job.append([["python %s/run_psychip_pool_input.py %s/inputs.json map %s controls" %(os.path.dirname(os.path.abspath(__file__)), inputs['outdir'], idx)]])
         job.run()
         
-        job.append([["python run_psychip_pool_input.py %s/inputs.json pooling" %(inputs['outdir'])]])
+        job.append([["python %s/run_psychip_pool_input.py %s/inputs.json pooling" %(os.path.dirname(os.path.abspath(__file__)), inputs['outdir'])]])
         job.run()
         for idx in range(len(inputs['inputs']) + 1): # the plus one is for the pooled input
-            job.append([["python run_psychip_pool_input.py %s/inputs.json peak %s" %(inputs['outdir'], idx)]])
+            job.append([["python %s/run_psychip_pool_input.py %s/inputs.json peak %s" %(os.path.dirname(os.path.abspath(__file__)), inputs['outdir'], idx)]])
         job.run()
     else:
         for idx in range(len(inputs['inputs'])):
-            job.append([["python run_psychip.py %s/inputs.json %s" %(inputs['outdir'], idx)]])
+            job.append([["python %s/run_psychip.py %s/inputs.json %s" %(os.path.dirname(os.path.abspath(__file__)), inputs['outdir'], idx)]])
         job.run()
-        job.append([["python run_psychip_pool_input.py %s/inputs.json pooling" %(inputs['outdir'])]])
+        job.append([["python %s/run_psychip_pool_input.py %s/inputs.json pooling" %(os.path.dirname(os.path.abspath(__file__)), inputs['outdir'])]])
         job.run()
-        job.append([["python run_psychip_pool_input.py %s/inputs.json peak %s" %(inputs['outdir'], len(inputs['inputs'])+1)]])
+        job.append([["python %s/run_psychip_pool_input.py %s/inputs.json peak %s" %(os.path.dirname(os.path.abspath(__file__)), inputs['outdir'], len(inputs['inputs'])+1)]])
         job.run()
 
 
