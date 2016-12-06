@@ -191,7 +191,7 @@ class PostFilter():
             job.append([[ "rm %s" %(tmp_bam) ]])
             job.run()
         else:
-            command = "bedtools bamtobed -i %s | " %(self.final_bam)\
+            command = "bedtools bamtobed -i %s | cut -f1-3 | " %(self.final_bam)\
                       + "sort --parallel=%s -k1,1 -k2,2n | " %(threads)\
                       + "gzip -c > %s" %(self.bed)
 
