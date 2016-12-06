@@ -29,9 +29,10 @@ import utils.job_runner as jr
 
 
 class PostFilter():
-    def __init__(self, raw_sam, output_dir):
+    def __init__(self, raw_sam, output_dir, is_paired=True):
         self.output_dir = output_dir
         self.prefix = os.path.basename(raw_sam).split(".raw.")[0]
+        self.is_paired = is_paired
 
         if not os.path.basename(raw_sam):
             raise Exception("raw SAM file does not exist")
@@ -47,23 +48,25 @@ class PostFilter():
 
     def remove_badcigar(self, threads=1):
         job = jr.JobRunner()
+        peek = []
 
-        # Find reads with bad CIGAR strings
-        badcigar = "%s/%s.badcigar" %(self.output_dir, self.prefix)
-        command = """zcat %s | \
-                     awk 'BEGIN{FS="\t"; OFS="\t"}
-                          !/^@/ && $6!="*" {
-                          cigar=$6; gsub("[0-9]+D","",cigar);
-                          n=split(cigar, vals, "[A-Z]");
-                          s=0; for(i=1;i<=n;i++) s=s+vals[i];
-                          seqlen=length($10);
-                          if(s!=seqlen) print $1"\t";}' | \
-                     sort | uniq > %s""" %(self.raw_sam, badcigar)
-        job.append([[ command ]])
-        job.run()
+        if self.is_paired:
+            # Find reads with bad CIGAR strings
+            badcigar = "%s/%s.badcigar" %(self.output_dir, self.prefix)
+            command = """zcat %s | \
+                         awk 'BEGIN{FS="\t"; OFS="\t"}
+                              !/^@/ && $6!="*" {
+                              cigar=$6; gsub("[0-9]+D","",cigar);
+                              n=split(cigar, vals, "[A-Z]");
+                              s=0; for(i=1;i<=n;i++) s=s+vals[i];
+                              seqlen=length($10);
+                              if(s!=seqlen) print $1"\t";}' | \
+                         sort | uniq > %s""" %(self.raw_sam, badcigar)
+            job.append([[ command ]])
+            job.run()
 
-        with open(badcigar) as fp:
-            peek = [x for i,x in enumerate(fp) if i<10 and x.rstrip()]
+            with open(badcigar) as fp:
+                peek = [x for i,x in enumerate(fp) if i<10 and x.rstrip()]
 
         # Remove the reads with bad CIGAR strings
         if len(peek):
@@ -89,25 +92,32 @@ class PostFilter():
         tmp_bam = "%s/%s.tmp.bam" %(self.output_dir, self.prefix)
         tmp_clean_bam = "%s/%s.tmp.clean.bam" %(self.output_dir, self.prefix)
 
-        # Filter unmapped and low quality (MAPQ<20) reads
-        command = "samtools view -@ %s -F1804 -f2 -q 20 -h" %(threads)\
-                   + "-u %s | " %(self.raw_bam)\
-                   + "samtools sort -@ %s -o %s -n -" %(threads, tmp_bam)
-        job.append([[ command ]])
-        job.run()
+        if self.is_paired:
+            # Filter unmapped and low quality (MAPQ<20) reads
+            command = "samtools view -@ %s -F1804 -f2 -q 20 -h" %(threads)\
+                       + "-u %s | " %(self.raw_bam)\
+                       + "samtools sort -@ %s -o %s -n -" %(threads, tmp_bam)
+            job.append([[ command ]])
+            job.run()
 
-        # Filter orphan reads (pair was removed), and read pairs
-        # mapping to different chromosomes
-        command = "samtools fixmate -r %s %s" %(tmp_bam, tmp_clean_bam)
-        job.append([[ command ]])
-        job.run()
-        command = "samtools view -@ %s -F1804 -f2 -u %s | " %(threads, tmp_clean_bam)\
-                   + "samtools sort -@ %s -o %s -" %(threads, self.flt_bam)
-        job.append([[ command ]])
-        job.run()
+            # Filter orphan reads (pair was removed), and read pairs
+            # mapping to different chromosomes
+            command = "samtools fixmate -r %s %s" %(tmp_bam, tmp_clean_bam)
+            job.append([[ command ]])
+            job.run()
+            command = "samtools view -@ %s -F1804 -f2 -u %s | " %(threads, tmp_clean_bam)\
+                       + "samtools sort -@ %s -o %s -" %(threads, self.flt_bam)
+            job.append([[ command ]])
+            job.run()
 
-        job.append([[ "rm %s %s" %(tmp_bam, tmp_clean_bam) ]])
-        job.run()
+            job.append([[ "rm %s %s" %(tmp_bam, tmp_clean_bam) ]])
+            job.run()
+        else:
+            # Filter unmapped and low quality (MAPQ<20) reads
+            command = "samtools view -@ %s -F1804 -q 20 " %(threads)\
+                      + "-u %s -o %s" %(self.raw_bam, self.flt_bam)
+            job.append([[ command ]])
+            job.run()
 
 
     def remove_artifacts(self, picard_jar, threads = 1, sponge = None):
@@ -130,13 +140,18 @@ class PostFilter():
         job.append([[ "mv %s %s" %(tmp_bam, self.flt_bam) ]])
         job.run()
 
+        pair_opt = ""
+        if self.is_paired:
+            pair_opt = "-f2"
+
         if sponge:
-            command = "samtools view -@ %s -F1804 -f2 -h %s | " %(threads, self.flt_bam)\
+            command = "samtools view -@ %s " %(threads)\
+                       + "-F1804 %s -h %s | " %(pair_opt, self.flt_bam)\
                        + "grep -vF -f %s - | " %(sponge)\
                        + "samtools view -@ %s -b -o %s -" %(threads, self.final_bam)
             job.append([[ command ]])
         else:
-            command = "samtools view -@ %s -F1804 -f2 -b " %(threads)\
+            command = "samtools view -@ %s -F1804 %s -b " %(threads, pair_opt)\
                        + "-o %s %s" %(self.final_bam, self.flt_bam)
             job.append([[ command ]])
         job.run()
@@ -153,29 +168,32 @@ class PostFilter():
 
         job = jr.JobRunner()
 
-        tmp_bam = "%s/%s.tmp.bam" %(self.output_dir, self.prefix)
+        if self.is_paired:
+            tmp_bam = "%s/%s.tmp.bam" %(self.output_dir, self.prefix)
+            command = "samtools sort -@ %s -n -o %s %s" %(threads, tmp_bam, self.final_bam)
+            job.append([[ command ]])
+            job.run()
 
-        command = "samtools sort -@ %s -n -o %s %s" %(threads, tmp_bam, self.final_bam)
-        job.append([[ command ]])
-        job.run()
+            command = "bedtools bamtobed -bedpe -mate1 -i %s | " %(tmp_bam)\
+                       + "gzip -c > %s" %(self.bedpe)
+            job.append([[ command ]])
+            job.run()
+            command = """zcat %s | \
+                         awk 'BEGIN{OFS="\t"; FS="\t"}
+                              { chrom=$1; beg=$2; end=$6;
+                                if($2>$5){beg=$5} if($3>$6){end=$3}
+                                print chrom,beg,end
+                              }' - | sort --parallel=%s -k1,1 -k2,2n | \
+                         gzip -c > %s""" %(self.bedpe, threads, self.bed)
+            job.append([[ command ]])
+            job.run()
 
-        command = "bedtools bamtobed -bedpe -mate1 -i %s | " %(tmp_bam)\
-                   + "gzip -c > %s" %(self.bedpe)
-        job.append([[ command ]])
-        job.run()
-
-        command = """zcat %s | \
-                     awk 'BEGIN{OFS="\t"; FS="\t"}
-                          { chrom=$1; beg=$2; end=$6;
-                            if($2>$5){beg=$5} if($3>$6){end=$3}
-                            print chrom,beg,end
-                          }' - | sort --parallel=%s -k1,1 -k2,2n |gzip -c > %s""" %(self.bedpe, threads, self.bed)
-        job.append([[ command ]])
-        job.run()
-
-        job.append([[ "rm %s" %(tmp_bam) ]])
-        job.run()
-
+            job.append([[ "rm %s" %(tmp_bam) ]])
+            job.run()
+        else:
+            command = "bedtools bamtobed -i %s | " %(self.final_bam)\
+                      + "sort --parallel=%s -k1,1 -k2,2n | " %(threads)\
+                      + "gzip -c > %s" %(self.bed)
 
     def clean(self):
         # Clean up intermediate files

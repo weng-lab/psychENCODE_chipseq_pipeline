@@ -28,15 +28,16 @@ import re
 import utils.job_runner as jr
 
 class BwaMapper():
-    def __init__(self, fastq1, fastq2, prefix, genome_index, output_dir):
-        self.fastq1 = fastq1
-        self.fastq2 = fastq2
+    def __init__(self, prefix, genome_index, output_dir):
         self.genome_index = genome_index
         self.prefix = prefix
         self.output_dir = output_dir
 
 
-    def run(self, cpu_num):
+    def run(self, cpu_num, fastq1, fastq2=""):
+        self.fastq1 = fastq1
+        self.fastq2 = fastq2 # empty string = single-end
+
         if cpu_num <= 0:
             raise Exeption("The number of CPU must be > 0!")
 
@@ -44,14 +45,6 @@ class BwaMapper():
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
-
-        # Extract prefix
-#        fq1 = os.path.basename(self.fastq1)
-#        ext = re.search(".f[ast]*q", fq1)
-#        if ext:
-#            prefix = fq1[:ext.start()]
-#        else:
-#            prefix = fq1
         
         sam_output = "%s/%s.raw.sam.gz" %(self.output_dir, self.prefix)
 
@@ -61,4 +54,3 @@ class BwaMapper():
 
         job.append([[command]])
         job.run()
-
