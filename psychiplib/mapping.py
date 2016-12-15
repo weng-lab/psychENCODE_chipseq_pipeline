@@ -28,16 +28,15 @@ import re
 import utils.job_runner as jr
 
 class BwaMapper():
-    def __init__(self, prefix, genome_index, output_dir):
+    def __init__(self, prefix, genome_index, output_dir, fastq1, fastq2=""):
+        self.fastq1 = fastq1
+        self.fastq2 = fastq2 # empty string = single-end
         self.genome_index = genome_index
         self.prefix = prefix
         self.output_dir = output_dir
 
 
-    def run(self, cpu_num, fastq1, fastq2=""):
-        self.fastq1 = fastq1
-        self.fastq2 = fastq2 # empty string = single-end
-
+    def run(self, cpu_num):
         if cpu_num <= 0:
             raise Exeption("The number of CPU must be > 0!")
 

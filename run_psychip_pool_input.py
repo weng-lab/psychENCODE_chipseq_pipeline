@@ -37,14 +37,15 @@ import traceback
 
 def map_inputs(inputs,idx):
     ### ALIGN INPUT LIBRARIES
-    run_map_input = mp.BwaMapper(inputs['inputs'][idx][0], # fastq read 1
-                            inputs['inputs'][idx][1], # fastq read 2
+    run_map_input = mp.BwaMapper(
                             inputs['prefix_inputs'][idx], #prefix
                             inputs['index'], # bwa index
                             os.path.join(os.path.join(inputs['outdir'],\
                                          inputs['prefix_inputs'][idx]),\
-                                         "bwa_out"))
-                                         # output directory
+                                         "bwa_out"), # output directory
+                            inputs['inputs'][idx][0], # fastq read 1
+                            inputs['inputs'][idx][1]) # fastq read 2
+
 
     run_map_input.run(inputs['cpus']) # CPU for BWA
                      # Output: R1.raw.sam.gz
@@ -137,14 +138,15 @@ def map_inputs(inputs,idx):
 
 def map_controls(inputs, idx):
     ### ALIGN CONTROL LIBRARIES
-    run_map_control = mp.BwaMapper(inputs['controls'][idx][0], # fastq read 1
-                            inputs['controls'][idx][1], # fastq read 2
+    run_map_control = mp.BwaMapper(
                             inputs['prefix_controls'][idx], #prefix
                             inputs['index'], # bwa index
                             os.path.join(os.path.join(inputs['outdir'],\
                                          inputs['prefix_controls'][idx]),\
-                                         "bwa_out"))
-                                         # output directory
+                                         "bwa_out"), # output directory
+                            inputs['controls'][idx][0], # fastq read 1
+                            inputs['controls'][idx][1]) # fastq read 2
+
 
     run_map_control.run(inputs['cpus']) # CPU for BWA
                      # Output: R1.raw.sam.gz
