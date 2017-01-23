@@ -49,7 +49,7 @@ class QC():
         job.run()
 
 
-    def get_library_complexity(self, flt_bam, threads=1):
+    def get_library_complexity(self, flt_bam, is_paired=True, threads=1):
         if not os.path.exists(flt_bam):
             raise Exception("filtered BAM file does not exist")
 
@@ -82,13 +82,18 @@ class QC():
         job.append([[ command ]])
         job.run()
 
-        command = """bedtools bamtobed -bedpe -i %s | \
-                     awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | \
-                     grep -v 'chrM' | sort | uniq -c | \
-                     awk 'BEGIN{mt=0;m0=0;m1=0;m2=0; OFS="\t"}
-                               ($1==1){m1=m1+1} ($1==2){m2=m2+1} {m0=m0+1} {mt=mt+$1}
-                          END{print mt,m0,m1,m2,m0/mt,m1/m0,m1/m2}'\
-                     >> %s""" %(flt_bam, qc_pbc)
+        if is_paired:
+            command = """bedtools bamtobed -bedpe -i %s | \
+                         awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | """
+        else:
+            command = """bedtools bamtobed -i %s | " \
+                         awk 'BEGIN{OFS="\t"}{print $1,$2,$3,$6}' | """
+        command += """grep -v 'chrM' | sort | uniq -c | \
+                      awk 'BEGIN{mt=0;m0=0;m1=0;m2=0; OFS="\t"}
+                           ($1==1){m1=m1+1} ($1==2){m2=m2+1} {m0=m0+1} {mt=mt+$1}
+                           END{print mt,m0,m1,m2,m0/mt,m1/m0,m1/m2}'\
+                      >> %s"""
+        command = command %(flt_bam, qc_pbc)
         job.append([[ command ]])
         job.run()
 
